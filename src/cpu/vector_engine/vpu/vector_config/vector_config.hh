@@ -47,6 +47,7 @@
  * into VLEN/SEW standard-width elements
  * Vector standard element width - VSEW.
  * The VL is given in elements.
+ * SLEN parameter is fixed to the MVL
  */
 
 class VectorConfig : public SimObject

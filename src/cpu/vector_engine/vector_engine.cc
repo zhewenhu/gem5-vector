@@ -280,23 +280,24 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
 
 
 void
-VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *vector_dyn_insn)
+VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *vector_dyn_insn, uint8_t micro_op_number)
 {
-    /*
-     * The bigger LMUL value is 8, then for LMUL=8 it is needed to assign 8 physical registers
-     * for LMUL=4 it is needed to assign 4 physical registers
-     * for LMUL=2 it is needed to assign 2 physical registers
-     * for LMUL=1 it is needed to assign 1 physical register
-     */
-    uint64_t PDst;//[8];
-    uint64_t POldDst;//[8];
+    /* Physical registers */
+    uint64_t PDst;
+    uint64_t POldDst;
     uint64_t Pvs1,Pvs2;
+
+    /* A vector mask occupies only one vector register regardless of SEW and LMUL.
+     * The mask bits that are used for each vector operation depends on the current
+     * SEW and LMUL setting.
+     */
     uint64_t PMask;
+    /* Logical registers */
     uint64_t vd;
     uint64_t vs1,vs2;
-    vd = insn.vd();
-    vs1 = insn.vs1();
-    vs2 = insn.vs2();
+    vd = insn.vd() + micro_op_number;
+    vs1 = insn.vs1()  + micro_op_number;
+    vs2 = insn.vs2()  + micro_op_number;
 
     masked_op = (insn.vm()==0);
 
@@ -306,14 +307,6 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
 
     uint8_t mop = insn.mop();
     bool gather_op = (mop ==3);
-
-    bool is_widening = insn.isWConvertFPToInt() || insn.isWConvertIntToFP() || insn.isWConvertFPToFP();
-    //uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
-    //uint8_t physical_regs_count = lmul;
-
-    if(is_widening) {
-        panic("Widening Instruction insn=%#h is not supported\n", insn.machInst);
-    }
 
     if (insn.isVectorInstMem()) {
         if (insn.isLoad()) {
@@ -382,6 +375,12 @@ void
 VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
     uint64_t src1,uint64_t src2,std::function<void()> dependencie_callback)
 {
+    /* Vector configuration instructions configure the registers last_vtype
+     * and last_vl. Next instructions takes the configuration from those
+     * registers, and carry out the values to be executed.
+     * By doing this, out-of-order issue scheme does not care about the vector
+     * configuration instructions.
+     */
     if (insn.isVecConfig()) {
         last_vtype = src2;
         last_vl = src1;
@@ -396,6 +395,10 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         assert( insn.arith1Src() | insn.arith2Srcs() | insn.arith3Srcs() );
     }
 
+    if(insn.isWidening() || insn.isNarrowing()){
+        panic("Widening/Narrowing vector instructions are not fully suported \n");
+    }
+
     if ((vector_inst_queue->Instruction_Queue.size()==0)
         && (vector_inst_queue->Memory_Queue.size()==0)) {
         vector_inst_queue->startTicking(*this/*,dependencie_callback*/);
@@ -403,44 +406,59 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
 
     dst_write_ena = !insn.VectorToScalar();
 
-    VectorDynInst *vector_dyn_insn = new VectorDynInst();
+    /* When LMUL is bigger than 1, the instruction is splited in several micro operations.
+     * Each micro operation has its own destination register and source operands
+     * for LMUL=8 it is needed to assign 8 physical registers
+     * for LMUL=4 it is needed to assign 4 physical registers
+     * for LMUL=2 it is needed to assign 2 physical registers
+     * for LMUL=1 it is needed to assign 1 physical register
+     */
+    uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
 
-    renameVectorInst(insn,vector_dyn_insn);
-
-    if (vector_rob->rob_empty()) {
-        vector_rob->startTicking(*this);
+    if(insn.is_slide() && (lmul>1)) {
+        panic("Slide with lmul>1 is not suported \n");
     }
 
-    if (insn.isVectorInstMem()) {
-        dependencie_callback();
-        uint32_t rob_entry = vector_rob->set_rob_entry(
-            vector_dyn_insn->get_POldDst(), insn.isLoad());
-        vector_dyn_insn->set_rob_entry(rob_entry);
-        vector_inst_queue->Memory_Queue.push_back(
-            new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                NULL,src1,src2,last_vtype,last_vl));
-        printMemInst(insn,vector_dyn_insn);
-    }
-    else if (insn.isVectorInstArith()) {
-        if (dst_write_ena) {
+    for(uint8_t i=0; i<lmul; i++) {
+        VectorDynInst *vector_dyn_insn = new VectorDynInst();
+        renameVectorInst(insn,vector_dyn_insn,i);
+
+        if (vector_rob->rob_empty()) {
+            vector_rob->startTicking(*this);
+        }
+
+        if (insn.isVectorInstMem()) {
             dependencie_callback();
             uint32_t rob_entry = vector_rob->set_rob_entry(
-                vector_dyn_insn->get_POldDst() , 1);
+                vector_dyn_insn->get_POldDst(), insn.isLoad());
             vector_dyn_insn->set_rob_entry(rob_entry);
-            vector_inst_queue->Instruction_Queue.push_back(
+            vector_inst_queue->Memory_Queue.push_back(
                 new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                NULL,src1,src2,last_vtype,last_vl));
-        } else {
-            uint32_t rob_entry = vector_rob->set_rob_entry(0 , 0);
-            vector_dyn_insn->set_rob_entry(rob_entry);
-            vector_inst_queue->Instruction_Queue.push_back(
-                new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                dependencie_callback,src1,src2,last_vtype,last_vl));
+                    NULL,src1,src2,last_vtype,last_vl));
+            printMemInst(insn,vector_dyn_insn);
         }
-        printArithInst(insn,vector_dyn_insn,src1);
-    } else {
-        panic("Invalid Vector Instruction, insn=%X\n", insn.machInst);
+        else if (insn.isVectorInstArith()) {
+            if (dst_write_ena) {
+                dependencie_callback();
+                uint32_t rob_entry = vector_rob->set_rob_entry(
+                    vector_dyn_insn->get_POldDst() , 1);
+                vector_dyn_insn->set_rob_entry(rob_entry);
+                vector_inst_queue->Instruction_Queue.push_back(
+                    new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
+                    NULL,src1,src2,last_vtype,last_vl));
+            } else {
+                uint32_t rob_entry = vector_rob->set_rob_entry(0 , 0);
+                vector_dyn_insn->set_rob_entry(rob_entry);
+                vector_inst_queue->Instruction_Queue.push_back(
+                    new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
+                    dependencie_callback,src1,src2,last_vtype,last_vl));
+            }
+            printArithInst(insn,vector_dyn_insn,src1);
+        } else {
+            panic("Invalid Vector Instruction, insn=%X\n", insn.machInst);
+        }
     }
+   
 }
 
 void

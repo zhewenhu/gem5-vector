@@ -189,7 +189,7 @@ public:
 
     void dispatch(RiscvISA::VectorStaticInst& insn ,ExecContextPtr& xc ,
         uint64_t src1, uint64_t src2, std::function<void()> dependencie_callback);
-    void renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *dyn_insn);
+    void renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *dyn_insn, uint8_t micro_op_number);
 
     void issue(RiscvISA::VectorStaticInst& insn, VectorDynInst *dyn_insn,
         ExecContextPtr& xc,
