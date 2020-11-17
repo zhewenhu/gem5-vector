@@ -76,7 +76,7 @@ last_vl(0)
     DPRINTF(VectorEngineInfo,"Number of Physical Registers: %d \n"
         ,vector_rename->PhysicalRegs );
     DPRINTF(VectorEngineInfo,"Maximum VL: %d-bits\n"
-        , vector_config->get_mvl_lmul1_bits() );
+        , vector_config->get_max_vector_length_bits() );
     DPRINTF(VectorEngineInfo,"Register File size: %dKB\n"
         , (float)vector_reg->get_size()/1024.0 );
     DPRINTF(VectorEngineInfo,"Vector Reorder buffer size: %d\n"
@@ -127,7 +127,6 @@ VectorEngine::regStats()
 
 }
 
-
 bool
 VectorEngine::requestGrant(RiscvISA::VectorStaticInst *insn)
 {
@@ -138,19 +137,29 @@ VectorEngine::requestGrant(RiscvISA::VectorStaticInst *insn)
         && !vector_inst_queue->mem_queue_full());
 
     /* Usually, the Vector engine must ensure to have at least 1 physical register to accept an instruction.
-     * However, for widening operations this is different. When Widening operation with LMUL=2 means that 
+     * However, for LMUL>1 configurations this is different. When a vector operation with LMUL=2 means that 
      * the vector engine must have at least 2 physical registers available in order to acceept the instruction.
      * When LMUL=4, means that the vector engine must have at least 4 physical registers available in order 
      * to accept the instruction. And finally when LMUL=8, means that the vector engine must have at least 
      * 8 physical registers available in order to accept the instruction.
+     * In the case 
+     *
+     * The vector INT/FP compare instructions compare two source operands and write the comparison result to a
+     * mask register. The destination mask vector is always held in a single vector register,
+     * with a layout of elements as described in Section Mask Register Layout.
+     *
+     * Vector mask-register logical operations operate on mask registers. The size of one element in a mask register
+     * is SEW/LMUL, so these instructions all operate on single vector registers regardless of the setting of the vl-
+     * mul eld in vtype. They do not change the value of vlmul.
      */ 
-    bool is_widening = insn->isWConvertFPToInt() || insn->isWConvertIntToFP() || insn->isWConvertFPToFP();
+    bool mask_dst = insn->isMaskDst();
+
     uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
 
-    bool enough_physical_regs = (lmul == 1) ? vector_rename->frl_elements() >= 1 :
-                                (is_widening && (lmul == 2)) ? vector_rename->frl_elements() >= 2 :
-                                (is_widening && (lmul == 4)) ? vector_rename->frl_elements() >= 4 :
-                                (is_widening && (lmul == 8)) ? vector_rename->frl_elements() >= 8 : 0;
+    bool enough_physical_regs = ((lmul == 1) || mask_dst) ? vector_rename->frl_elements() >= 1 :
+                                (lmul == 2) ? vector_rename->frl_elements() >= 2 :
+                                (lmul == 4) ? vector_rename->frl_elements() >= 4 :
+                                (lmul == 8) ? vector_rename->frl_elements() >= 8 : 0;
     return  enough_physical_regs && queue_slots_available
         && rob_entry_available;
     //return  !vector_rename->frl_empty() && queue_slots_available
@@ -219,16 +228,16 @@ VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vecto
     {
         if (gather_op){
             DPRINTF(VectorInst,"%s v%d v%d       PC 0x%X\n",insn.getName(),insn.vd(),insn.vs2(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"%s v%d v%d %s  old_dst v%d ,  \n",insn.getName(),PDst,Pvs2,mask_ren.str(),POldDst);
+            DPRINTF(VectorRename,"renamed inst: %s v%d v%d %s  old_dst v%d ,  \n",insn.getName(),PDst,Pvs2,mask_ren.str(),POldDst);
         } else {
             DPRINTF(VectorInst,"%s v%d       PC 0x%X\n",insn.getName(),insn.vd(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"%s v%d %s  old_dst v%d\n",insn.getName(),PDst,mask_ren.str(),POldDst);
+            DPRINTF(VectorRename,"renamed inst: %s v%d %s  old_dst v%d\n",insn.getName(),PDst,mask_ren.str(),POldDst);
         }
     }
     else if (insn.isStore())
     {
         DPRINTF(VectorInst,"%s v%d       PC 0x%X\n",insn.getName(),insn.vd(),*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"%s v%d %s\n",insn.getName(),PDst,mask_ren.str());
+        DPRINTF(VectorRename,"renamed inst: %s v%d %s\n",insn.getName(),PDst,mask_ren.str());
     } else {
         panic("Invalid Vector Instruction insn=%#h\n", insn.machInst);
     }
@@ -263,15 +272,15 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
 
     if (insn.arith1Src()) {
         DPRINTF(VectorInst,"%s %s%d v%d %s           PC 0x%X\n",insn.getName(),reg_type,insn.vd(),insn.vs2(),masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"%s %s%d v%d %s  old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,mask_ren.str(),POldDst);
+        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s  old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,mask_ren.str(),POldDst);
     }
     else if (insn.arith2Srcs()) {
         DPRINTF(VectorInst,"%s %s%d v%d %s%d %s       PC 0x%X\n",insn.getName(),reg_type,insn.vd(),insn.vs2(),scr1_type,insn.vs1(),masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"%s %s%d v%d %s%d %s  old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,Pvs1,mask_ren.str(),POldDst);
+        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s%d %s  old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,Pvs1,mask_ren.str(),POldDst);
     }
     else if (insn.arith3Srcs()) {
         DPRINTF(VectorInst,"%s %s%d v%d %s%d %s       PC 0x%X\n",insn.getName(),reg_type,insn.vd(),insn.vs2(),scr1_type,insn.vs1(),masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"%s %s%d v%d %s%d v%d %s old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,Pvs1,POldDst,mask_ren.str(),POldDst);
+        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s%d v%d %s old_dst v%d\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,Pvs1,POldDst,mask_ren.str(),POldDst);
     } else {
         panic("Invalid Vector Instruction insn=%#h\n", insn.machInst);
     }
@@ -282,20 +291,18 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
 void
 VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *vector_dyn_insn, uint8_t micro_op_number)
 {
-    /* Physical registers */
-    uint64_t PDst;
-    uint64_t POldDst;
-    uint64_t Pvs1,Pvs2;
-
+    //vector_rename->print_rat();
     /* A vector mask occupies only one vector register regardless of SEW and LMUL.
      * The mask bits that are used for each vector operation depends on the current
      * SEW and LMUL setting.
      */
-    uint64_t PMask;
+    bool mask_dst = insn.isMaskDst();
+    /* Vector comparison instruction  */
+    uint8_t dst_increase = (mask_dst) ? 0 : micro_op_number;
     /* Logical registers */
     uint64_t vd;
     uint64_t vs1,vs2;
-    vd = insn.vd() + micro_op_number;
+    vd = insn.vd() + dst_increase;
     vs1 = insn.vs1()  + micro_op_number;
     vs2 = insn.vs2()  + micro_op_number;
 
@@ -309,6 +316,12 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
     bool gather_op = (mop ==3);
 
     if (insn.isVectorInstMem()) {
+            /* Physical registers */
+            Pvs1 = 1024;
+            Pvs2 = 1024;
+            PMask = 1024;
+            PDst = 1024;
+            POldDst = 1024;
         if (insn.isLoad()) {
             if (gather_op) {
                 Pvs2 = vector_rename->get_preg_rat(vs2);
@@ -323,6 +336,7 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
             /* Physical Old Destination */
             POldDst = vector_rename->get_preg_rat(vd);
             vector_dyn_insn->set_POldDst(POldDst);
+            vector_dyn_insn->setPOldDstValid(1);
             /* Setting the New Destination in the RAT structure */
             vector_rename->set_preg_rat(vd,PDst);
             /* Setting to 0 the new physical destinatio valid bit*/
@@ -341,23 +355,31 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
         /* Physical  Mask */
         PMask = masked_op ? vector_rename->get_preg_rat(0) :1024;
         vector_dyn_insn->set_PMask(PMask);
+        /* When the instruction creates a mask, only the first microoperation whould get
+         * a new register from the frl. Next microoperations must use the same since
+         * mask vector registers are always allocated in only one register no matter LMUL.
+         */
+
         /* Physical Destination */
-        PDst = (dst_write_ena) ? vector_rename->get_frl() :1024;
+        PDst =  (mask_dst && (micro_op_number>0)) ? PDst:
+                (dst_write_ena) ? vector_rename->get_frl() :1024;
         vector_dyn_insn->set_PDst(PDst);
         /* Physical Old Destination */
-        POldDst = (dst_write_ena) ? vector_rename->get_preg_rat(vd) : 1024;
+        POldDst = (mask_dst && (micro_op_number>0)) ? POldDst:
+                  (dst_write_ena) ? vector_rename->get_preg_rat(vd) : 1024;
         vector_dyn_insn->set_POldDst(POldDst);
+        bool old_dst_valid = (mask_dst && (micro_op_number<(lmul-1))) ? 0:
+                             dst_write_ena ? 1:0;
+        vector_dyn_insn->setPOldDstValid(old_dst_valid);
         /* Physical source 2 */
         Pvs2 = vector_rename->get_preg_rat(vs2);
         vector_dyn_insn->set_PSrc2(Pvs2);
         /* When the instruction use an scalar value as source 1, the physical source 1 is disable
          * When the instruction uses only 1 source (insn.arith1Src()), the  source 1 is disable
          */
-        if( !(vx_op || vf_op || vi_op) && !insn.arith1Src()) {
-             /* Physical source 1 */
-            Pvs1 = vector_rename->get_preg_rat(vs1);
-            vector_dyn_insn->set_PSrc1(Pvs1);
-        }
+         /* Physical source 1 */
+        Pvs1 = (!(vx_op || vf_op || vi_op) && !insn.arith1Src()) ? vector_rename->get_preg_rat(vs1) : 1024;
+        vector_dyn_insn->set_PSrc1(Pvs1);
         /* dst_write_ena is set when the instruction has a vector destination register */
         if(dst_write_ena) {
             /* Setting the New Destination in the RAT structure */
@@ -403,7 +425,7 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         && (vector_inst_queue->Memory_Queue.size()==0)) {
         vector_inst_queue->startTicking(*this/*,dependencie_callback*/);
     }
-
+    /* vector arithmetic operation which write a vector register*/
     dst_write_ena = !insn.VectorToScalar();
 
     /* When LMUL is bigger than 1, the instruction is splited in several micro operations.
@@ -413,52 +435,63 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
      * for LMUL=2 it is needed to assign 2 physical registers
      * for LMUL=1 it is needed to assign 1 physical register
      */
-    uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
+    lmul =  insn.VectorToScalar()       ?   1:
+            insn.VectorMaskLogical()    ?   1:
+            vector_config->get_vtype_lmul(last_vtype);
 
     if(insn.is_slide() && (lmul>1)) {
         panic("Slide with lmul>1 is not suported \n");
     }
 
+    micro_op_vl_accum = last_vl;
+
     for(uint8_t i=0; i<lmul; i++) {
-        VectorDynInst *vector_dyn_insn = new VectorDynInst();
+        VectorDynInst *vector_dyn_insn = new VectorDynInst(&insn,i);
         renameVectorInst(insn,vector_dyn_insn,i);
+        
+        DPRINTF(VectorEngine,"Creating Vector Dynamic instruction %s  microoperation number %d\n" ,vector_dyn_insn->get_VectorStaticInst()->getName() , vector_dyn_insn->getMicroOpNumber() );
 
         if (vector_rob->rob_empty()) {
             vector_rob->startTicking(*this);
         }
 
+        /* When LMUL>1, each microoperation has its own vl */
+        micro_op_vl_accum = micro_op_vl_accum - vector_config->get_max_vector_length_elem(last_vtype);
+        uint64_t vl_iter = ((i+1)* vector_config->get_max_vector_length_elem(last_vtype));
+        uint64_t mvl = vector_config->get_max_vector_length_elem(last_vtype);
+        micro_op_vl = (last_vl >= vl_iter ) ? mvl : micro_op_vl_accum;
+
         if (insn.isVectorInstMem()) {
-            dependencie_callback();
+            if(i==0) {dependencie_callback();}
             uint32_t rob_entry = vector_rob->set_rob_entry(
                 vector_dyn_insn->get_POldDst(), insn.isLoad());
             vector_dyn_insn->set_rob_entry(rob_entry);
             vector_inst_queue->Memory_Queue.push_back(
                 new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                    NULL,src1,src2,last_vtype,last_vl));
+                    NULL,src1,src2,last_vtype,micro_op_vl));
             printMemInst(insn,vector_dyn_insn);
         }
         else if (insn.isVectorInstArith()) {
             if (dst_write_ena) {
-                dependencie_callback();
+                if(i==0) {dependencie_callback();}
                 uint32_t rob_entry = vector_rob->set_rob_entry(
-                    vector_dyn_insn->get_POldDst() , 1);
+                    vector_dyn_insn->get_POldDst() , vector_dyn_insn->getPOldDstValid());
                 vector_dyn_insn->set_rob_entry(rob_entry);
                 vector_inst_queue->Instruction_Queue.push_back(
                     new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                    NULL,src1,src2,last_vtype,last_vl));
+                    NULL,src1,src2,last_vtype,micro_op_vl));
             } else {
                 uint32_t rob_entry = vector_rob->set_rob_entry(0 , 0);
                 vector_dyn_insn->set_rob_entry(rob_entry);
                 vector_inst_queue->Instruction_Queue.push_back(
                     new InstQueue::QueueEntry(insn,vector_dyn_insn,xc,
-                    dependencie_callback,src1,src2,last_vtype,last_vl));
+                    dependencie_callback,src1,src2,last_vtype,micro_op_vl));
             }
             printArithInst(insn,vector_dyn_insn,src1);
         } else {
             panic("Invalid Vector Instruction, insn=%X\n", insn.machInst);
         }
     }
-   
 }
 
 void
@@ -466,13 +499,13 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
     ExecContextPtr& xc ,uint64_t src1 ,uint64_t src2,uint64_t vtype,
     uint64_t vl, std::function<void(Fault fault)> done_callback) {
 
-    uint64_t pc = insn.getPC();
+    //uint64_t pc = insn.getPC();
     
     if (insn.isVectorInstMem())
     {
         VectorMemIns++;
-        DPRINTF(VectorEngine,"Sending instruction %s to VMU, pc 0x%lx\n"
-            ,insn.getName() , *(uint64_t*)&pc );
+        //DPRINTF(VectorEngine,"Sending instruction %s to VMU, pc 0x%lx\n"
+        //    ,insn.getName() , *(uint64_t*)&pc );
         vector_memory_unit->issue(*this,insn,dyn_insn, xc,src1,vtype,
             vl, done_callback);
 
@@ -486,8 +519,8 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
         for (int i=0 ; i< num_clusters ; i++) {
             if (!vector_lane[i]->isOccupied()) { lane_id_available = i; }
         }
-        DPRINTF(VectorEngine,"Sending instruction %s to cluster %d, pc 0x%lx\n",
-            insn.getName(), lane_id_available , *(uint64_t*)&pc);
+        //DPRINTF(VectorEngine,"Sending instruction %s to cluster %d, pc 0x%lx\n",
+        //    insn.getName(), lane_id_available , *(uint64_t*)&pc);
         vector_lane[lane_id_available]->issue(*this,insn,dyn_insn, xc, src1,
             vtype, vl,done_callback);
     } else {

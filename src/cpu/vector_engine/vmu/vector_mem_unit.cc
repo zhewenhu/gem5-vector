@@ -88,7 +88,7 @@ void VectorMemUnit::issue(VectorEngine& vector_wrapper,
     bool  location;
 
     uint64_t mvl_bits =
-        vectorwrapper->vector_config->get_max_vector_length_bits(vtype);
+        vectorwrapper->vector_config->get_max_vector_length_bits();
     uint64_t mvl_elem =
         vectorwrapper->vector_config->get_max_vector_length_elem(vtype);
 
@@ -109,8 +109,8 @@ void VectorMemUnit::issue(VectorEngine& vector_wrapper,
             }
         });
 
-        mem_addr = src1;
-        location = 0;
+        mem_addr = src1 + (dyn_insn->getMicroOpNumber() * ((mvl_bits / 8)));
+        location = 0; // 0 Memory
         DPRINTF(VectorMemUnit,"Vector Load from Base Memory Addrs: 0x%lx\n",
             mem_addr );
 
@@ -260,7 +260,7 @@ void VectorMemUnit::issue(VectorEngine& vector_wrapper,
         }
     } else if (insn.isStore()) {
 
-        mem_addr0 = src1;
+        mem_addr0 = src1 + (dyn_insn->getMicroOpNumber() * ((mvl_bits / 8)));
         location0 = 0; // 0 = Memoria
 
         DPRINTF(VectorMemUnit,"Vector Store to Memory Addrs: 0x%lx ,int reg :"

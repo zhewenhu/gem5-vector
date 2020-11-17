@@ -74,24 +74,19 @@ uint64_t
 VectorConfig::get_max_vector_length_elem(uint64_t vtype) {
     uint32_t mvl_elem=0;
     uint32_t sew  =  get_vtype_sew(vtype);
-    uint32_t lmul = get_vtype_lmul(vtype);
+    /* We defined microoperations, then the MVL is the defined for 1 vector register no matter the lmul configuration*/
+    uint32_t lmul = 1; //get_vtype_lmul(vtype); 
     mvl_elem = lmul*max_vector_length/sew;
     return mvl_elem;
 }
 
 uint64_t
-VectorConfig::get_max_vector_length_bits(uint64_t vtype) {
+VectorConfig::get_max_vector_length_bits() {
     uint32_t mvl_bits=0;
     //uint32_t sew  =  get_vtype_sew(vtype);
-    uint32_t lmul = get_vtype_lmul(vtype);
+    /* We defined microoperations, then the MVL is the defined for 1 vector register no matter the lmul configuration*/
+    uint32_t lmul = 1; //get_vtype_lmul(vtype);
     mvl_bits = lmul*max_vector_length;
-    return mvl_bits;
-}
-
-uint64_t
-VectorConfig::get_mvl_lmul1_bits() {
-    uint32_t mvl_bits=0;
-    mvl_bits = max_vector_length;
     return mvl_bits;
 }
 

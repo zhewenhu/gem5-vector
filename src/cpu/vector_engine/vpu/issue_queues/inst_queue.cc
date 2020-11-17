@@ -230,7 +230,13 @@ InstQueue::evaluate()
                 // Setting the Valid Bit
                 bool wb_enable = !Instruction->insn.VectorToScalar();
                 uint64_t Dst = Instruction->dyn_insn->get_PDst();
-                if (wb_enable)
+                /* When the instruction creates a mask, only the last microoperation whould set
+                * the valid bit register. getPOldDstValid() method represents the last microoperation
+                * and it is used in two different places, first in the ROB to signal the old dst of the 
+                * last microoperation and to set the valid bit of the last microoperation.
+                */
+                bool valid_mask_dst = Instruction->dyn_insn->getPOldDstValid();
+                if (wb_enable && valid_mask_dst)
                 {
                 DPRINTF(VectorValidBit,"Set Valid bit to reg: %lu  with "
                     "value:%lu\n",Dst,1);

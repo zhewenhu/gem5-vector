@@ -31,7 +31,7 @@
 #include "debug/Datapath.hh"
 
 float
-Datapath::compute_float_fp_op(float Aitem, float Bitem, int Mitem,
+Datapath::compute_float_fp_op(float Aitem, float Bitem, uint8_t Mitem,
     float Dstitem,  RiscvISA::VectorStaticInst* insn)
 {
     float Ditem=0;
@@ -140,7 +140,7 @@ Datapath::compute_float_fp_op(float Aitem, float Bitem, int Mitem,
 
 double
 Datapath::compute_double_fp_op(double Aitem, double Bitem,
-     long int Mitem, double Dstitem,  RiscvISA::VectorStaticInst* insn)
+     uint8_t Mitem, double Dstitem,  RiscvISA::VectorStaticInst* insn)
 {
     float Ditem=0;
     std::string operation = insn->getName();
@@ -247,7 +247,7 @@ Datapath::compute_double_fp_op(double Aitem, double Bitem,
 }
 
 double 
-Datapath::computeDoubleFPReduction(double accumDp,double Bitem,long int Mitem)
+Datapath::computeDoubleFPReduction(double accumDp,double Bitem,uint8_t Mitem)
 {
     double reduction;
     std::string operation = insn->getName();
@@ -273,7 +273,7 @@ Datapath::computeDoubleFPReduction(double accumDp,double Bitem,long int Mitem)
 }
 
 float
-Datapath::computeSingleFPReduction(float accumSp,float Bitem,int Mitem)
+Datapath::computeSingleFPReduction(float accumSp,float Bitem,uint8_t Mitem)
 {
     float reduction;
     std::string operation = insn->getName();
@@ -393,7 +393,7 @@ Datapath::compute_double_fp_comp_op(double Aitem, double Bitem,
 
 long int
 Datapath::compute_long_int_op(long int Aitem, long int Bitem,
-    long int Mitem, long int Dstitem,  RiscvISA::VectorStaticInst* insn)
+    uint8_t Mitem, long int Dstitem,  RiscvISA::VectorStaticInst* insn)
 {
     long int Ditem=0;
     std::string operation = insn->getName();
@@ -551,7 +551,7 @@ Datapath::compute_long_int_op(long int Aitem, long int Bitem,
 }
 
 int
-Datapath::compute_int_op(int Aitem, int Bitem, int Mitem,
+Datapath::compute_int_op(int Aitem, int Bitem, uint8_t Mitem,
         int Dstitem,  RiscvISA::VectorStaticInst* insn)
 {
     int Ditem=0;
@@ -835,7 +835,7 @@ Datapath::computeIntMaskLogicalOp(bool Aitem, bool Bitem,
 }
 
 double
-Datapath::compute_cvt_f_x_64_op( long int Bitem, long int Mitem,
+Datapath::compute_cvt_f_x_64_op( long int Bitem, uint8_t Mitem,
     long int Dstitem,  RiscvISA::VectorStaticInst* insn)
 {
     double Ditem=0;
@@ -857,7 +857,7 @@ Datapath::compute_cvt_f_x_64_op( long int Bitem, long int Mitem,
 }
 
 float
-Datapath::compute_cvt_f_x_32_op( int Bitem, int Mitem, int Dstitem,
+Datapath::compute_cvt_f_x_32_op( int Bitem, uint8_t Mitem, int Dstitem,
     RiscvISA::VectorStaticInst* insn)
 {
     float Ditem=0;
@@ -879,7 +879,7 @@ Datapath::compute_cvt_f_x_32_op( int Bitem, int Mitem, int Dstitem,
 }
 
 long int
-Datapath::compute_cvt_x_f_64_op( double Bitem, long int Mitem,
+Datapath::compute_cvt_x_f_64_op( double Bitem, uint8_t Mitem,
     double Dstitem, RiscvISA::VectorStaticInst* insn)
 {
     long int Ditem=0;
@@ -901,7 +901,7 @@ Datapath::compute_cvt_x_f_64_op( double Bitem, long int Mitem,
 }
 
 int
-Datapath::compute_cvt_x_f_32_op( float Bitem, int Mitem,
+Datapath::compute_cvt_x_f_32_op( float Bitem, uint8_t Mitem,
     float Dstitem, RiscvISA::VectorStaticInst* insn)
 {
     int Ditem=0;

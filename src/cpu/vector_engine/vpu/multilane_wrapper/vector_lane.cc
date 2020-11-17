@@ -80,6 +80,8 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     // 0 = 8-bit , 1 = 16-bit , 2 = 32-bit , 3 = 64-bit , 4 = 128-bit
     uint64_t sew;
     sew = vectorwrapper->vector_config->get_vtype_sew(vtype);
+    uint64_t lmul;
+    lmul = vectorwrapper->vector_config->get_vtype_lmul(vtype);
     /* destination data type size in bytes */
     uint8_t SIZE = sew/8;
     assert(SIZE != 0);
@@ -90,7 +92,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     uint64_t DATA_SIZE = SIZE;
     uint64_t DST_SIZE = SIZE;
 
-    uint64_t addr_src0;
+    uint64_t addr_dst;
     uint64_t addr_src1;
     uint64_t addr_src2;
     uint64_t addr_Mask;
@@ -108,12 +110,24 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     vf_op = (insn.func3()==5);
     vi_op = (insn.func3()==3);
 
+    /*Mask destination. Two instructions types creates a mask: isFPCompare()  isIntCompare()*/
+    bool mask_dst = insn.isMaskDst();
+    uint64_t mask_dst_data = 0;
+    uint8_t mask_elements = 0;
+
     //address in bytes
-    uint64_t mvl_bits =vectorwrapper->vector_config->get_max_vector_length_bits(vtype);
-    addr_src0 = (uint64_t)dyn_insn->get_PDst() * mvl_bits / 8;
+    uint64_t mvl_bits =vectorwrapper->vector_config->get_max_vector_length_bits();
+
+    addr_dst = (!mask_dst) ? (uint64_t)dyn_insn->get_PDst() * mvl_bits / 8 :
+                             ((uint64_t)dyn_insn->get_PDst() * mvl_bits / 8) + (dyn_insn->getMicroOpNumber() * ((mvl_bits / 8)/lmul));
+
     addr_src1 = (uint64_t)dyn_insn->get_PSrc1() * mvl_bits / 8;
     addr_src2 = (uint64_t)dyn_insn->get_PSrc2() * mvl_bits / 8;
-    addr_Mask = (uint64_t)dyn_insn->get_PMask() * mvl_bits / 8;
+    /* The mask is allocated in only one register no matter the lmul parameter,
+     * then, for the diferent masked microoperations, the address of the mask change
+     */
+    addr_Mask = ((uint64_t)dyn_insn->get_PMask() * mvl_bits / 8) + (dyn_insn->getMicroOpNumber() * ((mvl_bits / 8)/lmul));
+
     addr_OldDst = (uint64_t)dyn_insn->get_POldDst() * mvl_bits / 8;
     location = 1;
 
@@ -126,6 +140,12 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     uint64_t mvl_element =
         vectorwrapper->vector_config->get_max_vector_length_elem(vtype);
 
+    uint64_t pc = insn.getPC();
+    DPRINTF(VectorLane,"Executing inst %s, microOp  %d, pc 0x%lx, DataType = %d-bit\n" ,
+        insn.getName(),dyn_insn->getMicroOpNumber(),*(uint64_t*)&pc, DATA_SIZE*8);
+
+    vectorwrapper->printArithInst(insn,dyn_insn,0);
+
     DPRINTF(VectorLane,"Executing instruction %s in cluster %d, , vl = %d , mvl =  %d\n",
         insn.getName(), lane_id , vl_count,mvl_element);
 
@@ -134,6 +154,9 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     {
         dst_count = 1;
         src1_count = 1;
+    } else if(mask_dst) {
+        dst_count = vl_count/lmul;
+        src1_count = vl_count;
     } else {
         dst_count = mvl_element;
         src1_count = vl_count;
@@ -165,7 +188,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
     this->MdataQ.clear();
     this->DstdataQ.clear();
 
-    dyn_insn->set_VectorStaticInst(&insn);
+    //dyn_insn->set_VectorStaticInst(&insn);
 
     if (move_to_core)
     {
@@ -214,14 +237,34 @@ VectorLane::issue(VectorEngine& vector_wrapper,
 
         dataPath->startTicking(*this, insn, vl_count, dst_count, sew,
         slide_count ,src1,
-        [dyn_insn,done_callback,xc,mvl_element,vl_count,DST_SIZE,this]
-        (uint8_t *data, uint8_t size, bool done)
-        {
+        [dyn_insn,done_callback,xc,mvl_element,vl_count,DST_SIZE,mask_dst,lmul,mask_elements,mask_dst_data,this]
+        (uint8_t *data, uint8_t size, bool done) mutable {
             assert(size == DST_SIZE);
 
             if (!vector_to_scalar)
             {
-                this->dstWriter->queueData(data);
+                if(mask_dst) {
+                    uint8_t mask_size_bits = DST_SIZE*8 / lmul;
+                    //DPRINTF(VectorLane,"mask_size_bits: 0x%d\n",mask_size_bits);
+                    //DPRINTF(VectorLane,"mask_elements: 0x%d\n",mask_elements);
+                    //DPRINTF(VectorLane,"lmul: 0x%d\n",lmul);
+                    mask_dst_data = mask_dst_data | (*(uint8_t *)data << (mask_elements*mask_size_bits) );
+                    delete data;
+                    //DPRINTF(VectorLane,"mask_dst_data: %X\n",mask_dst_data);
+                    mask_elements++;
+                    if ((mask_elements == lmul) || done) {
+                        mask_elements = 0;
+                        uint8_t *ndata = new uint8_t[DST_SIZE];
+                        memcpy(ndata, &mask_dst_data, DST_SIZE);
+                        this->dstWriter->queueData(ndata);
+                        mask_dst_data=0;
+                        if (DST_SIZE==8) {  DPRINTF(VectorLane,"Writting mask Rrgister: %X\n",*(uint64_t*)ndata);  }
+                        if (DST_SIZE==4) {  DPRINTF(VectorLane,"Writting mask Rrgister: %X\n",*(uint32_t*)ndata);  }
+                    }
+                }
+                else {
+                    this->dstWriter->queueData(data);
+                }
             }
             else
             {
@@ -255,6 +298,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
                 DPRINTF(VectorLane,"Leaving vector_lane \n");
             }
 
+            // Debe haber un caso especial para mask_dst  CHECARRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
             if (done){
                 int zero_count = mvl_element-vl_count;
                 uint8_t * ZeroData = (uint8_t *)malloc(zero_count*DST_SIZE);
@@ -277,7 +321,10 @@ VectorLane::issue(VectorEngine& vector_wrapper,
 
         if (!vector_to_scalar)
         {
-            dstWriter->initialize(vector_wrapper,dst_count,DST_SIZE,addr_src0,
+            //mask_dst
+            //uint32_t vl_count_aux = ((vl_count%lmul)==0) ? vl_count/lmul: (vl_count/lmul)+1 ;
+
+            dstWriter->initialize(vector_wrapper,dst_count,DST_SIZE,addr_dst,
                 location, xc,[done_callback,dst_count,this](bool done)
             {
                 ++Dread;
@@ -377,22 +424,28 @@ VectorLane::issue(VectorEngine& vector_wrapper,
 
         if (masked_op)
         {
-            //DPRINTF(VectorLane,"Reading Source M \n" );
-            srcMReader->initialize(vector_wrapper,vl_count,DATA_SIZE,addr_Mask,
-                0,location, xc, [addr_Mask,DATA_SIZE,vl_count,this]
+            uint32_t vl_count_aux = ((vl_count%lmul)==0) ? vl_count/lmul: (vl_count/lmul)+1 ;
+
+            srcMReader->initialize(vector_wrapper,vl_count_aux,DATA_SIZE,addr_Mask,
+                0,location, xc, [addr_Mask,DATA_SIZE,vl_count,lmul,this]
                 (uint8_t*data, uint8_t size, bool done)
             {
                 assert(size == DATA_SIZE);
-                uint8_t *ndata = new uint8_t[DATA_SIZE];
-                memcpy(ndata, data, DATA_SIZE);
-                this->MdataQ.push_back(ndata);
-                if (DATA_SIZE==8){ DPRINTF(VectorLane,"queue Data MaskReader "
-                    "0x%x , queue_size = %d \n" , *(uint64_t *) ndata ,
-                    this->MdataQ.size());}
-                if (DATA_SIZE==4){ DPRINTF(VectorLane,"queue Data MaskReader "
-                    "0x%x , queue_size = %d \n" , *(uint32_t *) ndata ,
-                    this->MdataQ.size());}
-                ++this->Mread;
+                DPRINTF(VectorLane,"queue Data MaskReader full %X ,addr_Mask %X\n" , *(uint32_t *)data ,addr_Mask);
+                uint8_t mask_size_bits = DATA_SIZE*8 / lmul;
+
+                uint64_t mask_full = *(uint64_t*)data;
+                uint8_t mask = 0;
+                for(int i=0;i<DATA_SIZE*8;i=i+mask_size_bits){
+                    uint8_t *ndata = new uint8_t;
+                    mask = get_bits(mask_full ,i, mask_size_bits);
+                    memcpy(ndata , &mask, 1);
+                    this->MdataQ.push_back(ndata);
+                    DPRINTF(VectorLane,"queue Data MaskReader %X , queue_size = %d \n" , *(uint8_t *)ndata  ,this->MdataQ.size());
+                    ++this->Mread;
+                    if(this->Mread == vl_count) {break;}
+                }
+
                 delete data;
                 assert(!done || (this->Mread == vl_count));
             });

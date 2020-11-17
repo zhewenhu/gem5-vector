@@ -100,6 +100,11 @@ class VectorLane : public SimObject
     bool vf_op;
     bool vi_op;
 
+    uint8_t get_bits(uint64_t mask, int bit_position, int len) const {
+        uint64_t shift_r = mask >> bit_position;
+        uint8_t valid_bits =  shift_r & ((uint8_t(1) << len)-1);
+        return valid_bits;
+    }
 };
 
 #endif // __CPU_VECTOR_EXE_UNIT_HH__

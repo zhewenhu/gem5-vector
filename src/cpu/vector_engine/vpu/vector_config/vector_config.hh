@@ -60,8 +60,7 @@ public:
     uint64_t reqAppVectorLength(uint64_t rvl, uint64_t vtype, bool r_mvl);
     uint64_t vector_length_in_bits(uint64_t vl, uint64_t vtype);
     uint64_t get_max_vector_length_elem(uint64_t vtype);
-    uint64_t get_max_vector_length_bits(uint64_t vtype);
-    uint64_t get_mvl_lmul1_bits();
+    uint64_t get_max_vector_length_bits();
 
     uint64_t get_vtype_lmul(uint64_t vtype);
     uint64_t get_vtype_sew(uint64_t vtype);
