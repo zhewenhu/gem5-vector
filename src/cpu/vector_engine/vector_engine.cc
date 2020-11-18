@@ -409,6 +409,7 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         dependencie_callback();
         printConfigInst(insn,src1,src2);
         VectorConfigIns++;
+        DPRINTF(VectorEngine,"Settig vl %d , sew %d , lmul %d\n",last_vl,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul(last_vtype));
         return;
     }
 
@@ -443,23 +444,24 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         panic("Slide with lmul>1 is not suported \n");
     }
 
-    micro_op_vl_accum = last_vl;
+    //micro_op_vl_accum = last_vl;
+
+    uint64_t vl_iter = 0;
+    uint64_t mvl = vector_config->get_max_vector_length_elem(last_vtype);
 
     for(uint8_t i=0; i<lmul; i++) {
         VectorDynInst *vector_dyn_insn = new VectorDynInst(&insn,i);
         renameVectorInst(insn,vector_dyn_insn,i);
         
-        DPRINTF(VectorEngine,"Creating Vector Dynamic instruction %s  microoperation number %d\n" ,vector_dyn_insn->get_VectorStaticInst()->getName() , vector_dyn_insn->getMicroOpNumber() );
+        /* When LMUL>1, each microoperation has its own vl */
+        micro_op_vl =   (vl_iter >= last_vl) ? 0 :
+                        (last_vl >= vl_iter) ? ((last_vl > mvl) ? mvl:last_vl ): vl_iter - last_vl;
+        vl_iter = ((i+1)* vector_config->get_max_vector_length_elem(last_vtype));
+        DPRINTF(VectorEngine,"Creating Vector Dynamic instruction %s  microoperation number %d , vl %d , mvl %d, last_vl %d , vl_iter %d\n" ,vector_dyn_insn->get_VectorStaticInst()->getName() , vector_dyn_insn->getMicroOpNumber(),micro_op_vl,mvl,last_vl,vl_iter);
 
         if (vector_rob->rob_empty()) {
             vector_rob->startTicking(*this);
         }
-
-        /* When LMUL>1, each microoperation has its own vl */
-        micro_op_vl_accum = micro_op_vl_accum - vector_config->get_max_vector_length_elem(last_vtype);
-        uint64_t vl_iter = ((i+1)* vector_config->get_max_vector_length_elem(last_vtype));
-        uint64_t mvl = vector_config->get_max_vector_length_elem(last_vtype);
-        micro_op_vl = (last_vl >= vl_iter ) ? mvl : micro_op_vl_accum;
 
         if (insn.isVectorInstMem()) {
             if(i==0) {dependencie_callback();}
@@ -499,13 +501,18 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
     ExecContextPtr& xc ,uint64_t src1 ,uint64_t src2,uint64_t vtype,
     uint64_t vl, std::function<void(Fault fault)> done_callback) {
 
-    //uint64_t pc = insn.getPC();
-    
+    uint64_t pc = insn.getPC();
     if (insn.isVectorInstMem())
     {
         VectorMemIns++;
-        //DPRINTF(VectorEngine,"Sending instruction %s to VMU, pc 0x%lx\n"
-        //    ,insn.getName() , *(uint64_t*)&pc );
+        DPRINTF(VectorEngine,"Issuing instruction %s to VMU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
+            ,insn.getName(),
+            vl,
+            vector_config->get_vtype_sew(vtype),
+            vector_config->get_vtype_lmul(vtype),
+            dyn_insn->getMicroOpNumber(),
+            *(uint64_t*)&pc );
+
         vector_memory_unit->issue(*this,insn,dyn_insn, xc,src1,vtype,
             vl, done_callback);
 
@@ -519,8 +526,15 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
         for (int i=0 ; i< num_clusters ; i++) {
             if (!vector_lane[i]->isOccupied()) { lane_id_available = i; }
         }
-        //DPRINTF(VectorEngine,"Sending instruction %s to cluster %d, pc 0x%lx\n",
-        //    insn.getName(), lane_id_available , *(uint64_t*)&pc);
+
+        DPRINTF(VectorEngine,"Issuing instruction %s to VPU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
+            ,insn.getName(),
+            vl,
+            vector_config->get_vtype_sew(vtype),
+            vector_config->get_vtype_lmul(vtype),
+            dyn_insn->getMicroOpNumber(),
+            *(uint64_t*)&pc );
+
         vector_lane[lane_id_available]->issue(*this,insn,dyn_insn, xc, src1,
             vtype, vl,done_callback);
     } else {
@@ -795,7 +809,6 @@ bool
 VectorEngine::writeVectorMem(Addr addr, uint8_t *data, uint32_t size,
     ThreadContext *tc, uint8_t channel, std::function<void(void)> callback)
 {
-    DPRINTF(VectorEngine, "inside writeVectorMem\n");
     uint64_t id = (uniqueReqId++);
     Vector_ReqState *pending = new Vector_W_ReqState(id, callback);
     vector_PendingReqQ.push_back(pending);

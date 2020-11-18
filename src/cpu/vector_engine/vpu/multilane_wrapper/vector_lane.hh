@@ -42,6 +42,7 @@
 #include "cpu/vector_engine/vmu/write_timing_unit.hh"
 #include "cpu/vector_engine/vpu/multilane_wrapper/datapath.hh"
 #include "params/VectorLane.hh"
+#include "debug/VectorLane.hh"
 #include "sim/faults.hh"
 #include "sim/sim_object.hh"
 
@@ -100,9 +101,9 @@ class VectorLane : public SimObject
     bool vf_op;
     bool vi_op;
 
-    uint8_t get_bits(uint64_t mask, int bit_position, int len) const {
+    uint64_t get_bits(uint64_t mask, int bit_position, int len) const {
         uint64_t shift_r = mask >> bit_position;
-        uint8_t valid_bits =  shift_r & ((uint8_t(1) << len)-1);
+        uint64_t valid_bits =  shift_r & ((uint64_t(1) << len)-1);
         return valid_bits;
     }
 };

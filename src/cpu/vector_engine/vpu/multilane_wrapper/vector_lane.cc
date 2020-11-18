@@ -299,7 +299,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
             }
 
             // Debe haber un caso especial para mask_dst  CHECARRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
-            if (done){
+            if (done && !mask_dst){
                 int zero_count = mvl_element-vl_count;
                 uint8_t * ZeroData = (uint8_t *)malloc(zero_count*DST_SIZE);
                 uint64_t zero_data = 0;
@@ -431,9 +431,8 @@ VectorLane::issue(VectorEngine& vector_wrapper,
                 (uint8_t*data, uint8_t size, bool done)
             {
                 assert(size == DATA_SIZE);
-                DPRINTF(VectorLane,"queue Data MaskReader full %X ,addr_Mask %X\n" , *(uint32_t *)data ,addr_Mask);
                 uint8_t mask_size_bits = DATA_SIZE*8 / lmul;
-
+                DPRINTF(VectorLane,"queue Data MaskReader full %X ,addr_Mask %X, mask_size_bits %d\n" , *(uint32_t *)data ,addr_Mask,mask_size_bits);
                 uint64_t mask_full = *(uint64_t*)data;
                 uint8_t mask = 0;
                 for(int i=0;i<DATA_SIZE*8;i=i+mask_size_bits){
