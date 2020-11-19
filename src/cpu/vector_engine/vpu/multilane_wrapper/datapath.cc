@@ -56,7 +56,7 @@ void
 Datapath::startTicking(
     VectorLane& data_op_unit, RiscvISA::VectorStaticInst& insn,
     uint64_t src_count, uint64_t dst_count, uint64_t vsew,
-    uint64_t slide_count, uint64_t src1,
+    uint64_t slide_count, uint64_t src1,bool next_micro_op,
     std::function<void(uint8_t*,uint8_t,bool)> data_callback)
 {
     assert(!running);
@@ -69,6 +69,7 @@ Datapath::startTicking(
     this->vsew = vsew;
     this->slide_count = slide_count;
     this->src1 = src1;
+    this->next_micro_op = next_micro_op;
     this->dataCallback = data_callback;
     //reset all state
     vecFuncs.clear();
@@ -109,6 +110,9 @@ Datapath::startTicking(
     Oplatency       =1;
     /*get the instruction latency in case it is not 1*/
     get_instruction_latency();
+    if (this->next_micro_op) {
+        Oplatency       = 1;
+    }
 
     /* 4 main groups */
     is_FP         = this->insn->isFP();

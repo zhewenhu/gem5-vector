@@ -235,8 +235,13 @@ VectorLane::issue(VectorEngine& vector_wrapper,
             assert(slide_count < vl_count);
         }
 
+        /* when next_micro_op is greater that zero, we set the oplatency in the datapath as 1,
+         * in order to emulate continued execution from previous micro operation
+         */
+        bool next_micro_op = (dyn_insn->getMicroOpNumber()>0);
+        /* starting the datapath*/
         dataPath->startTicking(*this, insn, vl_count, dst_count, sew,
-        slide_count ,src1,
+        slide_count ,src1,next_micro_op,
         [dyn_insn,done_callback,xc,mvl_element,vl_count,DST_SIZE,mask_dst,lmul,mask_elements,mask_dst_data,this]
         (uint8_t *data, uint8_t size, bool done) mutable {
             assert(size == DST_SIZE);
