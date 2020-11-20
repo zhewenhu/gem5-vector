@@ -86,6 +86,9 @@ class QueueEntry {
 
     bool arith_queue_full();
     bool mem_queue_full();
+
+    uint32_t mem_queue_available_entries();
+    uint32_t arith_queue_available_entries();
     //overrides
     void regStats() override;
     void evaluate() override;

@@ -130,6 +130,12 @@ ReorderBuffer::rob_empty()
 }
 
 uint32_t
+ReorderBuffer::rob_available_entries()
+{
+    return ROB_Size-valid_elements;
+}
+
+uint32_t
 ReorderBuffer::set_rob_entry(uint32_t old_dst, bool valid_old_dst)
 {
     assert(valid_elements < ROB_Size);
@@ -153,7 +159,7 @@ ReorderBuffer::set_rob_entry(uint32_t old_dst, bool valid_old_dst)
     }
 
     valid_elements ++;
-
+    DPRINTF(ReorderBuffer,"ROB entries used: %d\n",valid_elements);
     return return_tail;
 }
 

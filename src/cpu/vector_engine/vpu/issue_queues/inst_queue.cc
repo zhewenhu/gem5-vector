@@ -69,6 +69,19 @@ InstQueue::mem_queue_full()
     return (Memory_Queue.size() >= vector_mem_queue_size);
 }
 
+uint32_t
+InstQueue::mem_queue_available_entries()
+{
+    return vector_mem_queue_size-Memory_Queue.size();
+}
+
+uint32_t
+InstQueue::arith_queue_available_entries()
+{
+    return vector_arith_queue_size-Instruction_Queue.size();
+}
+
+
 void
 InstQueue::startTicking(
     VectorEngine& vector_wrapper/*,

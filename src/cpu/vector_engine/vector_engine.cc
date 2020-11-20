@@ -130,11 +130,14 @@ VectorEngine::regStats()
 bool
 VectorEngine::requestGrant(RiscvISA::VectorStaticInst *insn)
 {
-    bool rob_entry_available = !vector_rob->rob_full();
-    bool queue_slots_available = ((insn->isVectorInstArith()
-        || insn->isVecConfig()) && !vector_inst_queue->arith_queue_full())
-        || (insn->isVectorInstMem()
-        && !vector_inst_queue->mem_queue_full());
+    uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
+    /*When LMUL=N, we must ensure to have N available entries*/
+    //bool rob_entry_available = !vector_rob->rob_full();
+    bool rob_entry_available = (vector_rob->rob_available_entries() >= lmul);
+
+    bool queue_slots_available = (insn->isVectorInstArith() && (vector_inst_queue->arith_queue_available_entries() >=lmul))
+        || (insn->isVecConfig() && !vector_inst_queue->arith_queue_full())
+        || (insn->isVectorInstMem() && (vector_inst_queue->mem_queue_available_entries() >= lmul));
 
     /* Usually, the Vector engine must ensure to have at least 1 physical register to accept an instruction.
      * However, for LMUL>1 configurations this is different. When a vector operation with LMUL=2 means that 
@@ -154,14 +157,12 @@ VectorEngine::requestGrant(RiscvISA::VectorStaticInst *insn)
      */ 
     bool mask_dst = insn->isMaskDst();
 
-    uint8_t lmul = vector_config->get_vtype_lmul(last_vtype);
-
     bool enough_physical_regs = ((lmul == 1) || mask_dst) ? vector_rename->frl_elements() >= 1 :
                                 (lmul == 2) ? vector_rename->frl_elements() >= 2 :
                                 (lmul == 4) ? vector_rename->frl_elements() >= 4 :
                                 (lmul == 8) ? vector_rename->frl_elements() >= 8 : 0;
-    return  enough_physical_regs && queue_slots_available
-        && rob_entry_available;
+
+    return  enough_physical_regs && queue_slots_available && rob_entry_available;
     //return  !vector_rename->frl_empty() && queue_slots_available
     //    && rob_entry_available;
 }
