@@ -103,7 +103,7 @@ class VectorLane : public SimObject
 
     uint64_t get_bits(uint64_t mask, int bit_position, int len) const {
         uint64_t shift_r = mask >> bit_position;
-        uint64_t valid_bits =  shift_r & ((uint64_t(1) << len)-1);
+        uint64_t valid_bits =  shift_r & (uint64_t(1));
         return valid_bits;
     }
 };

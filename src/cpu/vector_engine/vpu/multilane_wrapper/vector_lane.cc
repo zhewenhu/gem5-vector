@@ -434,8 +434,8 @@ VectorLane::issue(VectorEngine& vector_wrapper,
             {
                 assert(size == DATA_SIZE);
                 uint8_t mask_size_bits = DATA_SIZE*8 / lmul;
-                DPRINTF(VectorLane,"queue Data MaskReader full %X ,addr_Mask %X, mask_size_bits %d\n" , *(uint32_t *)data ,addr_Mask,mask_size_bits);
                 uint64_t mask_full = *(uint64_t*)data;
+                //DPRINTF(VectorLane,"queue Data MaskReader full %X ,addr_Mask %X, mask_size_bits %d\n" , mask_full ,addr_Mask,mask_size_bits);
                 uint8_t mask = 0;
                 for(int i=0;i<DATA_SIZE*8;i=i+mask_size_bits){
                     uint8_t *ndata = new uint8_t;
