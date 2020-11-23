@@ -197,7 +197,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
          * element of some vector register and send immediately to
          * the scalar reg,such as vfmv_fs and vmv_xs
          */
-        srcBReader->initialize(vector_wrapper,1,DATA_SIZE,addr_src2,0,location,
+        srcBReader->initialize(vector_wrapper,1,DATA_SIZE,addr_src2,0,1,location,
             xc, [dyn_insn,done_callback,xc,DATA_SIZE,vl_count,this]
             (uint8_t*data, uint8_t size, bool done)
         {
@@ -326,11 +326,8 @@ VectorLane::issue(VectorEngine& vector_wrapper,
 
         if (!vector_to_scalar)
         {
-            //mask_dst
-            //uint32_t vl_count_aux = ((vl_count%lmul)==0) ? vl_count/lmul: (vl_count/lmul)+1 ;
-
             dstWriter->initialize(vector_wrapper,dst_count,DST_SIZE,addr_dst,
-                location, xc,[done_callback,dst_count,this](bool done)
+                0,1,location, xc,[done_callback,dst_count,this](bool done)
             {
                 ++Dread;
                 if (done) {
@@ -378,7 +375,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
         else if (!insn.arith1Src())
         {
             srcAReader->initialize(vector_wrapper,src1_count, DATA_SIZE,
-                addr_src1,0,location, xc, [DATA_SIZE,src1_count,this]
+                addr_src1,0,1,location, xc, [DATA_SIZE,src1_count,this]
                 (uint8_t*data, uint8_t size, bool done)
             {
                 assert(size == DATA_SIZE);
@@ -408,7 +405,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
                 addr_src2;
         }
 
-        srcBReader->initialize(vector_wrapper,vl_count, DATA_SIZE, addr_src2,0,
+        srcBReader->initialize(vector_wrapper,vl_count, DATA_SIZE, addr_src2,0,1,
             location, xc, [DATA_SIZE,vl_count,this]
             (uint8_t*data, uint8_t size, bool done)
         {
@@ -432,7 +429,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
             uint32_t vl_count_aux = ((vl_count%lmul)==0) ? vl_count/lmul: (vl_count/lmul)+1 ;
 
             srcMReader->initialize(vector_wrapper,vl_count_aux,DATA_SIZE,addr_Mask,
-                0,location, xc, [addr_Mask,DATA_SIZE,vl_count,lmul,this]
+                0,1,location, xc, [addr_Mask,DATA_SIZE,vl_count,lmul,this]
                 (uint8_t*data, uint8_t size, bool done)
             {
                 assert(size == DATA_SIZE);
@@ -460,7 +457,7 @@ VectorLane::issue(VectorEngine& vector_wrapper,
             //DPRINTF(VectorLane,"Reading Source DstOld \n" );
             //Leemos el old detination para el caso de mask Op
             dstReader->initialize(vector_wrapper,vl_count,DATA_SIZE,
-                addr_OldDst,0,location,xc,[addr_OldDst,DATA_SIZE,vl_count,this]
+                addr_OldDst,0,1,location,xc,[addr_OldDst,DATA_SIZE,vl_count,this]
                 (uint8_t*data, uint8_t size, bool done)
             {
                 assert(size == DATA_SIZE);

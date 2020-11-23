@@ -55,8 +55,8 @@ public:
     // Queuedata is used for indexed operations
     void queueData(uint8_t *data);
     void initialize(VectorEngine& vector_wrapper,uint64_t count,
-        uint64_t DST_SIZE,uint64_t mem_addr,uint8_t mop, bool location,
-        ExecContextPtr& xc,
+        uint64_t DST_SIZE,uint64_t mem_addr,uint8_t mop,uint64_t stride,
+        bool location, ExecContextPtr& xc,
         std::function<void(uint8_t*,uint8_t,bool)> on_item_load);
 
 private:
@@ -67,7 +67,7 @@ private:
 
     volatile bool done;
     std::function<bool(void)> readFunction;
-    //For indexed op
+    //Used by indexed Operations to hold the element index
     std::deque<uint8_t *> dataQ;
     //modified by readFunction closure over time
     uint64_t vecIndex;

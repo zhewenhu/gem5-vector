@@ -81,7 +81,7 @@ MemUnitReadTiming::queueData(uint8_t *data)
 
 void
 MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
-    uint64_t DST_SIZE,uint64_t mem_addr, uint8_t mop, bool location,
+    uint64_t DST_SIZE,uint64_t mem_addr, uint8_t mop,uint64_t stride, bool location,
     ExecContextPtr& xc, std::function<void(uint8_t*,
     uint8_t,bool)> on_item_load) {
 
@@ -94,9 +94,7 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
     uint64_t SIZE = DST_SIZE;
 
     uint64_t    vaddr       = mem_addr;
-    int32_t     vstride     = 1;
-
-    assert(mop != 2); //no stride operation .. comment this line to evaluate strided operation
+    int32_t     vstride     = stride;
 
     //reset vecIndex
     vecIndex = 0;
@@ -172,13 +170,15 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
 
             uint64_t index_addr;
             if (SIZE == 8) {
-            index_addr = (uint64_t)((uint64_t*)buf)[0];
-            }
-            else if (SIZE == 4) {
-            index_addr = (uint64_t)((uint32_t*)buf)[0];
-            }
-            else{
-                index_addr=0;
+                index_addr = (uint64_t)((uint64_t*)buf)[0];
+            } else if (SIZE == 4) {
+                index_addr = (uint64_t)((uint32_t*)buf)[0];
+            } else if (SIZE == 2) {
+                index_addr = (uint16_t)((uint16_t*)buf)[0];
+            } else if (SIZE == 1) {
+                index_addr = (uint8_t)((uint8_t*)buf)[0];
+            } else{
+                panic("invalid mem req SIZE");
             }
             addr = vaddr + index_addr;
             line_addr = addr - (addr % line_size);
@@ -193,10 +193,15 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
             //try to read more items in the same cache-line
             for (uint8_t j=1; j<got; j++) {
                 if (SIZE == 8) {
-                index_addr = (uint64_t)((uint64_t*)buf)[j];
-                }
-                else if (SIZE == 4) {
-                index_addr = (uint64_t)((uint32_t*)buf)[j];
+                    index_addr = (uint64_t)((uint64_t*)buf)[j];
+                } else if (SIZE == 4) {
+                    index_addr = (uint64_t)((uint32_t*)buf)[j];
+                } else if (SIZE == 2) {
+                    index_addr = (uint16_t)((uint16_t*)buf)[j];
+                } else if (SIZE == 1) {
+                    index_addr = (uint8_t)((uint8_t*)buf)[j];
+                } else {
+                    panic("invalid mem req SIZE"); break;
                 }
 
                 uint64_t next_addr = vaddr + index_addr;

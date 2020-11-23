@@ -211,7 +211,7 @@ void
 VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vector_dyn_insn)
 {
     uint64_t pc = insn.getPC();
-    bool gather_op = (insn.mop() ==3);
+    bool indexed = (insn.mop() ==3);
 
     uint32_t PDst = vector_dyn_insn->get_PDst();
     uint32_t POldDst = vector_dyn_insn->get_POldDst();
@@ -227,9 +227,9 @@ VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vecto
 
     if (insn.isLoad())
     {
-        if (gather_op){
+        if (indexed){
             DPRINTF(VectorInst,"%s v%d v%d       PC 0x%X\n",insn.getName(),insn.vd(),insn.vs2(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"renamed inst: %s v%d v%d %s  old_dst v%d ,  \n",insn.getName(),PDst,Pvs2,mask_ren.str(),POldDst);
+            DPRINTF(VectorRename,"renamed inst: %s v%d v%d %s  old_dst v%d\n",insn.getName(),PDst,Pvs2,mask_ren.str(),POldDst);
         } else {
             DPRINTF(VectorInst,"%s v%d       PC 0x%X\n",insn.getName(),insn.vd(),*(uint64_t*)&pc);
             DPRINTF(VectorRename,"renamed inst: %s v%d %s  old_dst v%d\n",insn.getName(),PDst,mask_ren.str(),POldDst);
@@ -237,8 +237,13 @@ VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vecto
     }
     else if (insn.isStore())
     {
-        DPRINTF(VectorInst,"%s v%d       PC 0x%X\n",insn.getName(),insn.vd(),*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"renamed inst: %s v%d %s\n",insn.getName(),PDst,mask_ren.str());
+        if (indexed){
+            DPRINTF(VectorInst,"%s v%d v%d       PC 0x%X\n",insn.getName(),insn.vd(),insn.vs2(),*(uint64_t*)&pc);
+            DPRINTF(VectorRename,"%s v%d v%d %s\n",insn.getName(),PDst,Pvs2,mask_ren.str());
+        } else {
+            DPRINTF(VectorInst,"%s v%d       PC 0x%X\n",insn.getName(),insn.vd(),*(uint64_t*)&pc );
+            DPRINTF(VectorRename,"%s v%d %s\n",insn.getName(),PDst,mask_ren.str());
+        }
     } else {
         panic("Invalid Vector Instruction insn=%#h\n", insn.machInst);
     }
@@ -314,17 +319,11 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
     vi_op = (insn.func3()==3);
 
     uint8_t mop = insn.mop();
-    bool gather_op = (mop ==3);
+    bool indexed = (mop ==3);
 
     if (insn.isVectorInstMem()) {
-            /* Physical registers */
-            Pvs1 = 1024;
-            Pvs2 = 1024;
-            PMask = 1024;
-            PDst = 1024;
-            POldDst = 1024;
         if (insn.isLoad()) {
-            if (gather_op) {
+            if (indexed) {
                 Pvs2 = vector_rename->get_preg_rat(vs2);
                 vector_dyn_insn->set_PSrc2(Pvs2);
             }
@@ -342,10 +341,16 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
             vector_rename->set_preg_rat(vd,PDst);
             /* Setting to 0 the new physical destinatio valid bit*/
             vector_reg_validbit->set_preg_valid_bit(PDst,0);
-            DPRINTF(VectorValidBit,"Set Valid-bit %d : %d\n",PDst,0);
         }
         else if (insn.isStore()) {
-            // TODO: maked stores are not implemented
+            
+            if (indexed) {
+                Pvs2 = vector_rename->get_preg_rat(vs2);
+                vector_dyn_insn->set_PSrc2(Pvs2);
+            }
+            /* Physical  Mask */
+            PMask = masked_op ? vector_rename->get_preg_rat(0) :1024;
+            vector_dyn_insn->set_PMask(PMask);
             /* Physical Destination corresponds to the source for store operations */
             PDst = vector_rename->get_preg_rat(vd);
             /* Physical Destination */
@@ -387,7 +392,6 @@ VectorEngine::renameVectorInst(RiscvISA::VectorStaticInst& insn, VectorDynInst *
             vector_rename->set_preg_rat(vd,PDst);
             /* Setting to 0 the new physical destinatio valid bit*/
             vector_reg_validbit->set_preg_valid_bit(PDst,0);
-            DPRINTF(VectorValidBit,"Set Valid-bit %d: %d\n",PDst,0);
         }
     } else {
             panic("Invalid Vector Instruction insn=%#h\n", insn.machInst);
@@ -413,6 +417,8 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         DPRINTF(VectorEngine,"Settig vl %d , sew %d , lmul %d\n",last_vl,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul(last_vtype));
         return;
     }
+
+    DPRINTF(VectorInst,"src1 %d, src2 %d\n",src1,src2);
 
     /* Be sure that the instruction was added to some group in base.isa */
     if (insn.isVectorInstArith()) {
@@ -506,7 +512,7 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
     if (insn.isVectorInstMem())
     {
         VectorMemIns++;
-        DPRINTF(VectorEngine,"Issuing instruction %s to VMU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
+        DPRINTF(VectorEngine,"Sending instruction %s to VMU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
             ,insn.getName(),
             vl,
             vector_config->get_vtype_sew(vtype),
@@ -514,7 +520,7 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
             dyn_insn->getMicroOpNumber(),
             *(uint64_t*)&pc );
 
-        vector_memory_unit->issue(*this,insn,dyn_insn, xc,src1,vtype,
+        vector_memory_unit->issue(*this,insn,dyn_insn, xc,src1,src2,vtype,
             vl, done_callback);
 
         SumVL = SumVL.value() + vector_config->vector_length_in_bits(vl,vtype);
@@ -528,7 +534,7 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
             if (!vector_lane[i]->isOccupied()) { lane_id_available = i; }
         }
 
-        DPRINTF(VectorEngine,"Issuing instruction %s to VPU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
+        DPRINTF(VectorEngine,"Sending instruction %s to VPU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
             ,insn.getName(),
             vl,
             vector_config->get_vtype_sew(vtype),
@@ -826,8 +832,8 @@ VectorEngine::writeVectorReg(Addr addr, uint8_t *data,
     uint32_t size, uint8_t channel,
     std::function<void(void)> callback)
 {
-    DPRINTF(VectorEngine, "writeVectorReg got %d bytes to write at %#x\n"
-        ,size, addr);
+    //DPRINTF(VectorEngine, "writeVectorReg got %d bytes to write at %#x\n"
+    //    ,size, addr);
     uint64_t id = (uniqueReqId++);
     Vector_ReqState *pending = new Vector_W_ReqState(id, callback);
     vector_PendingReqQ.push_back(pending);

@@ -57,9 +57,11 @@ public:
     void regStats() override;
 
     void queueData(uint8_t *data);
+    void queueAddrs(uint8_t *data);
     void initialize(VectorEngine& vector_wrapper, uint64_t count,
-        uint64_t DST_SIZE,uint64_t mem_addr, bool location,
-        ExecContextPtr& xc,std::function<void(bool)> on_item_store);
+        uint64_t DST_SIZE,uint64_t mem_addr,uint8_t mop,uint64_t stride,
+        bool location,ExecContextPtr& xc,
+        std::function<void(bool)> on_item_store);
 
 private:
     //set by params
@@ -69,6 +71,8 @@ private:
 
     volatile bool done;
     std::deque<uint8_t *> dataQ;
+    //Used by indexed Operations to hold the element index
+    std::deque<uint8_t *> AddrsQ;
     std::function<bool(void)> writeFunction;
 
     //modified by writeFunction closure over time
