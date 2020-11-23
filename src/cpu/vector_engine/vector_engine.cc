@@ -443,6 +443,12 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
      * for LMUL=2 it is needed to assign 2 physical registers
      * for LMUL=1 it is needed to assign 1 physical register
      */
+    lmul =  vector_config->get_vtype_lmul(last_vtype);
+
+    if(insn.VectorMaskLogical() && (lmul>1)) {
+        panic("Vector Mask Logical with lmul>1 is not suported \n");
+    }
+
     lmul =  insn.VectorToScalar()       ?   1:
             insn.VectorMaskLogical()    ?   1:
             vector_config->get_vtype_lmul(last_vtype);
@@ -450,8 +456,6 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
     if(insn.is_slide() && (lmul>1)) {
         panic("Slide with lmul>1 is not suported \n");
     }
-
-    //micro_op_vl_accum = last_vl;
 
     uint64_t vl_iter = 0;
     uint64_t mvl = vector_config->get_max_vector_length_elem(last_vtype);
