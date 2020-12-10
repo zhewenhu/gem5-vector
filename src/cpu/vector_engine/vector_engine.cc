@@ -515,7 +515,10 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
     uint64_t pc = insn.getPC();
     if (insn.isVectorInstMem())
     {
-        VectorMemIns++;
+        /* Only when MicroOp zero must be counted since the other microOp are the same*/
+        if (dyn_insn->getMicroOpNumber() == 0) {
+            VectorMemIns++;
+        }
         DPRINTF(VectorEngine,"Sending instruction %s to VMU, vl %d , sew %d , lmul %d , microop_number %d, pc 0x%lx\n"
             ,insn.getName(),
             vl,
@@ -530,9 +533,11 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
         SumVL = SumVL.value() + vector_config->vector_length_in_bits(vl,vtype);
     }
     else if (insn.isVectorInstArith()) {
-
+        /* Only when MicroOp zero must be counted since the other microOp are the same*/
+        if (dyn_insn->getMicroOpNumber() == 0) {
+            VectorArithmeticIns++;
+        }
         SumVL = SumVL.value() + vector_config->vector_length_in_bits(vl,vtype);
-        VectorArithmeticIns++;
         uint8_t lane_id_available = 0;
         for (int i=0 ; i< num_clusters ; i++) {
             if (!vector_lane[i]->isOccupied()) { lane_id_available = i; }
