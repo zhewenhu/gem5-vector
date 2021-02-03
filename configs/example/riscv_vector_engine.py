@@ -69,7 +69,7 @@ ps.add_option('--cpu_clk',          type="string", default='2GHz',
                                     help="Speed of all CPUs")
 
 # VECTOR REGISTER OPTIONS
-ps.add_option('--VRF_physical_regs',type="int", default=40,
+ps.add_option('--renamed_regs',type="int", default=40,
                                     help="Number of Vector Physical Registers")
 ps.add_option('--VRF_line_size',    type="int", default=64,
                                     help="Vector Register line size in Bytes")
@@ -205,7 +205,7 @@ system.cpu.ve_interface = VectorEngineInterface(
         ),
         vector_reg = VectorRegister(
             lanes_per_access = options.v_lanes/options.num_clusters,
-            size = (options.VRF_physical_regs * options.max_vl)/8,
+            size = (options.renamed_regs * options.max_vl)/8,
             lineSize =options.VRF_line_size
                         *(options.v_lanes/options.num_clusters),
             numPorts = vector_rf_ports,
@@ -217,13 +217,13 @@ system.cpu.ve_interface = VectorEngineInterface(
             vector_arith_queue_size = options.arith_queue_size
         ),
         vector_rename = VectorRename(
-            PhysicalRegs = options.VRF_physical_regs
+            PhysicalRegs = options.renamed_regs
         ),
         vector_rob = ReorderBuffer(
             ROB_Size = options.rob_size
         ),
         vector_reg_validbit = VectorValidBit(
-            PhysicalRegs = options.VRF_physical_regs
+            PhysicalRegs = options.renamed_regs
         ),
         vector_memory_unit = VectorMemUnit(
             memReader = MemUnitReadTiming(
