@@ -406,10 +406,16 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
     if (insn.isVecConfig()) {
         last_vtype = src2;
         last_vl = src1;
+
+        DPRINTF(VectorEngine,"1-Settig vl %d ,vtype %d, sew %d , lmul %d\n",last_vl,last_vtype,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul_prueba(last_vtype));
+        bool change_vtype = (vector_config->get_vtype_sew(last_vtype) == 16);
+//        last_vl = (reduce_4) ? last_vl/4 : last_vl;
+        last_vtype = change_vtype ? 14:last_vtype;
+
         dependencie_callback();
         printConfigInst(insn,src1,src2);
         VectorConfigIns++;
-        DPRINTF(VectorEngine,"Settig vl %d , sew %d , lmul %d\n",last_vl,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul(last_vtype));
+        DPRINTF(VectorEngine,"2-Settig vl %d ,vtype %d, sew %d , lmul %d\n",last_vl,last_vtype,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul(last_vtype));
         return;
     }
 
@@ -486,8 +492,8 @@ VectorEngine::issue(RiscvISA::VectorStaticInst& insn,VectorDynInst *dyn_insn,
     if (insn.isVectorInstMem())
     {
         VectorMemIns++;
-        DPRINTF(VectorEngine,"Sending instruction %s to VMU, pc 0x%lx\n"
-            ,insn.getName() , *(uint64_t*)&pc );
+        DPRINTF(VectorEngine,"Sending instruction %s to VMU (mem_addr 0X%lx) pc 0x%lx\n"
+            ,insn.getName() , src1, *(uint64_t*)&pc );
         vector_memory_unit->issue(*this,insn,dyn_insn, xc,src1,src2,vtype,
             vl, done_callback);
 

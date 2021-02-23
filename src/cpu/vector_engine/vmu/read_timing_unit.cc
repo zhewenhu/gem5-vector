@@ -109,9 +109,9 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
                 bool _done = ( (i+j+1) == count );
                 uint8_t *ndata = new uint8_t[SIZE];
                 memcpy(ndata, data + line_offsets[j], SIZE);
-                DPRINTF(MemUnitReadTiming,
-                    "calling on_item_load with size %d. 'done'=%d\n"
-                    ,SIZE, _done);
+                //DPRINTF(MemUnitReadTiming,
+                //    "calling on_item_load with size %d. 'done'=%d\n"
+                //    ,SIZE, _done);
                 on_item_load(ndata, SIZE, _done);
             }
         };
@@ -159,7 +159,7 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
 
             uint64_t can_get = this->dataQ.size();
             if (!can_get) {
-                DPRINTF(MemUnitReadTiming, "try_read dataQ Addrs empty\n");
+                //DPRINTF(MemUnitReadTiming, "try_read dataQ Addrs empty\n");
                 return false;
             }
             uint64_t got = std::min(line_size/SIZE, can_get);
@@ -185,8 +185,8 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
             line_offsets.push_back(addr % line_size);
             items_in_line = 1;
 
-            DPRINTF(MemUnitReadTiming, "Trying to get mora than 1 element"
-                " from a line\n");
+            //DPRINTF(MemUnitReadTiming, "Trying to get mora than 1 element"
+            //    " from a line\n");
             DPRINTF(MemUnitReadTiming, "reading addr  %#x ,line_addr %#x "
                 "with %d \n",addr, line_addr, items_in_line);
 
@@ -207,9 +207,9 @@ MemUnitReadTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
                 uint64_t next_addr = vaddr + index_addr;
                 uint64_t next_line_addr = next_addr - (next_addr % line_size);
 
-                DPRINTF(MemUnitReadTiming, "next_addr  %#x  \n",next_addr);
-                DPRINTF(MemUnitReadTiming, "next_line_addr  %#x ,line_addr "
-                    "%#x  \n",next_line_addr, line_addr);
+                //DPRINTF(MemUnitReadTiming, "next_addr  %#x  \n",next_addr);
+                //DPRINTF(MemUnitReadTiming, "next_line_addr  %#x ,line_addr "
+                //    "%#x  \n",next_line_addr, line_addr);
 
                 if (next_line_addr == line_addr) {
                     items_in_line += 1;

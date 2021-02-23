@@ -63,7 +63,9 @@ public:
     uint64_t get_mvl_lmul1_bits();
 
     uint64_t get_vtype_lmul(uint64_t vtype);
+    uint64_t get_vtype_lmul_prueba(uint64_t vtype);
     uint64_t get_vtype_sew(uint64_t vtype);
+    uint64_t get_vtype_sew2(uint64_t vtype);
     uint64_t get_vtype_ediv(uint64_t vtype);
 
 private:

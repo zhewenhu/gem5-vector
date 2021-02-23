@@ -57,8 +57,9 @@ uint64_t
 VectorConfig::reqAppVectorLength(uint64_t rvl, uint64_t vtype, bool r_mvl) {
     uint32_t gvl  = 0;
     uint32_t sew  =  get_vtype_sew(vtype);
-    uint32_t lmul = get_vtype_lmul(vtype);
-    gvl= lmul * max_vector_length/sew;
+    uint32_t lmul = 1;//get_vtype_lmul(vtype);
+
+    gvl= (sew == 16) ? lmul * max_vector_length/64 : lmul * max_vector_length/sew;
     return (r_mvl) ? gvl:(rvl>gvl) ? gvl:rvl;
 }
 
@@ -74,7 +75,8 @@ uint64_t
 VectorConfig::get_max_vector_length_elem(uint64_t vtype) {
     uint32_t mvl_elem=0;
     uint32_t sew  =  get_vtype_sew(vtype);
-    uint32_t lmul = get_vtype_lmul(vtype);
+    uint32_t lmul = 1;//get_vtype_lmul(vtype);
+
     mvl_elem = lmul*max_vector_length/sew;
     return mvl_elem;
 }
@@ -82,8 +84,7 @@ VectorConfig::get_max_vector_length_elem(uint64_t vtype) {
 uint64_t
 VectorConfig::get_max_vector_length_bits(uint64_t vtype) {
     uint32_t mvl_bits=0;
-    //uint32_t sew  =  get_vtype_sew(vtype);
-    uint32_t lmul = get_vtype_lmul(vtype);
+    uint32_t lmul = 1;//get_vtype_lmul(vtype);
     mvl_bits = lmul*max_vector_length;
     return mvl_bits;
 }
@@ -97,6 +98,25 @@ VectorConfig::get_mvl_lmul1_bits() {
 
 uint64_t
 VectorConfig::get_vtype_lmul(uint64_t vtype) {
+    uint8_t vlmul = 0;//vt(vtype,0,2);
+    uint64_t LMUL;
+
+    switch (vlmul){
+        case 0:
+            LMUL = 1; break;
+        case 1: 
+            LMUL = 2; break;
+        case 2:
+            LMUL = 4; break;
+        case 3:
+            LMUL = 8; break;
+        default:  panic("LMUL not implemented\n"); LMUL = 0;
+    }
+    return LMUL;
+}
+
+uint64_t
+VectorConfig::get_vtype_lmul_prueba(uint64_t vtype) {
     uint8_t vlmul = vt(vtype,0,2);
     uint64_t LMUL;
 

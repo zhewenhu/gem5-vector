@@ -119,10 +119,10 @@ MemUnitWriteTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
     {
         uint64_t can_get = this->dataQ.size();
         if (!can_get) {
-            DPRINTF(MemUnitWriteTiming, "try_write dataQ empty\n");
+            //DPRINTF(MemUnitWriteTiming, "try_write dataQ empty\n");
             return false;
         } else if (can_get < get_up_to){
-            DPRINTF(MemUnitWriteTiming, "try_write needs more elements\n");
+            //DPRINTF(MemUnitWriteTiming, "try_write needs more elements\n");
             return false;
         }
         uint64_t got = get_up_to; //std::min((uint64_t)get_up_to, can_get);
@@ -156,8 +156,8 @@ MemUnitWriteTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
         return [on_item_store,count,i,items_ready,this]() {
             for (uint64_t j=0; j<items_ready; ++j) {
                 bool _done = ( (i+j+1) == count );
-                DPRINTF(MemUnitWriteTiming,"calling on_item_store with"
-                    " 'done'=%d\n", _done);
+                //DPRINTF(MemUnitWriteTiming,"calling on_item_store with"
+                //    " 'done'=%d\n", _done);
                 on_item_store(_done);
             }
         };
@@ -202,7 +202,7 @@ MemUnitWriteTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
 
             uint64_t can_get = this->AddrsQ.size();
             if (!can_get) {
-                DPRINTF(MemUnitWriteTiming, "try_read AddrsQ Addrs empty\n");
+                //DPRINTF(MemUnitWriteTiming, "try_read AddrsQ Addrs empty\n");
                 return false;
             }
             uint64_t got = std::min(line_size/SIZE, can_get);
@@ -230,8 +230,8 @@ MemUnitWriteTiming::initialize(VectorEngine& vector_wrapper, uint64_t count,
         } //end indexed operation
 
         //now see if there is any data in the queue to write
-        DPRINTF(MemUnitWriteTiming,"getting data to write %d items at %#x\n",
-            consec_items, addr);
+        //DPRINTF(MemUnitWriteTiming,"getting data to write %d items at %#x\n",
+        //    consec_items, addr);
 
         return try_write(consec_items, [fin,location,xc,addr,SIZE,vindexed,
             count,i,this](uint8_t * data, uint32_t items_ready) -> uint8_t
