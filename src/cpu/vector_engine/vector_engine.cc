@@ -408,7 +408,8 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         last_vl = src1;
 
         DPRINTF(VectorEngine,"1-Settig vl %d ,vtype %d, sew %d , lmul %d\n",last_vl,last_vtype,vector_config->get_vtype_sew(last_vtype),vector_config->get_vtype_lmul_prueba(last_vtype));
-        bool change_vtype = (vector_config->get_vtype_sew(last_vtype) == 16);
+        bool change_vtype = ((vector_config->get_vtype_sew(last_vtype) == 16) || (vector_config->get_vtype_sew(last_vtype) == 8)) 
+                            /*&& (vector_config->get_vtype_lmul_prueba(last_vtype) != 1)*/;
 //        last_vl = (reduce_4) ? last_vl/4 : last_vl;
         last_vtype = change_vtype ? 14:last_vtype;
 
