@@ -1,6 +1,7 @@
 build_epi01
 build_epi02
 build_epi03
+build_*
 build
 parser.out
 parsetab.py
