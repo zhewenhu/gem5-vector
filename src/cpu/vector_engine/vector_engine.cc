@@ -42,6 +42,7 @@
 #include "debug/VectorEngine.hh"
 #include "debug/VectorEngineInfo.hh"
 #include "debug/VectorInst.hh"
+#include "debug/VectorInstRenamed.hh"
 #include "sim/faults.hh"
 #include "sim/sim_object.hh"
 
@@ -197,6 +198,8 @@ VectorEngine::printConfigInst(RiscvISA::VectorStaticInst& insn, uint64_t src1,ui
     uint64_t pc = insn.getPC();
     DPRINTF(VectorInst,"inst: %s vl:%d, vtype:%d       PC 0x%X\n"
         ,insn.getName(),src1,src2,*(uint64_t*)&pc );
+    DPRINTF(VectorInstRenamed,"renamed inst: %s vl:%d, vtype:%d       PC 0x%X\n"
+        ,insn.getName(),src1,src2,*(uint64_t*)&pc );
 }
 
 void
@@ -223,13 +226,13 @@ VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vecto
         if (indexed){
             DPRINTF(VectorInst,"inst: %s v%d v%d       PC 0x%X\n",
                 insn.getName(),insn.vd(),insn.vs2(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"renamed inst: %s v%d v%d %s  old_dst v%d"
+            DPRINTF(VectorInstRenamed,"renamed inst: %s v%d v%d %s  old_dst v%d"
                 "      PC 0x%X\n",insn.getName(),PDst,Pvs2,mask_ren.str(),POldDst,
                 *(uint64_t*)&pc);
         } else {
             DPRINTF(VectorInst,"inst: %s v%d       PC 0x%X\n"
                 ,insn.getName(),insn.vd(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"renamed inst: %s v%d %s  old_dst v%d     "
+            DPRINTF(VectorInstRenamed,"renamed inst: %s v%d %s  old_dst v%d     "
                 " PC 0x%X\n",insn.getName(),PDst,mask_ren.str(),POldDst,*(uint64_t*)&pc);
         }
     }
@@ -238,12 +241,12 @@ VectorEngine::printMemInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vecto
          if (indexed){
             DPRINTF(VectorInst,"inst: %s v%d v%d       PC 0x%X\n",
                 insn.getName(),insn.vd(),insn.vs2(),*(uint64_t*)&pc);
-            DPRINTF(VectorRename,"renamed inst: %s v%d v%d %s     PC 0x%X\n",
+            DPRINTF(VectorInstRenamed,"renamed inst: %s v%d v%d %s     PC 0x%X\n",
                 insn.getName(),Pvs3,Pvs2,mask_ren.str(),*(uint64_t*)&pc);
         } else {
             DPRINTF(VectorInst,"inst: %s v%d       PC 0x%X\n",
                 insn.getName(),insn.vd(),*(uint64_t*)&pc );
-            DPRINTF(VectorRename,"renamed inst: %s v%d %s       PC 0x%X\n",
+            DPRINTF(VectorInstRenamed,"renamed inst: %s v%d %s       PC 0x%X\n",
                 insn.getName(),Pvs3,mask_ren.str(),*(uint64_t*)&pc);
         }
         
@@ -284,7 +287,7 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
     if (insn.arith1Src()) {
         DPRINTF(VectorInst,"inst: %s %s%d v%d %s           PC 0x%X\n",
             insn.getName(),reg_type,insn.vd(),insn.vs2(),masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s  old_dst v%d     "
+        DPRINTF(VectorInstRenamed,"renamed inst: %s %s%d v%d %s  old_dst v%d     "
             "    PC 0x%X\n",insn.getName(),reg_type,PDst,Pvs2,mask_ren.str(),
             POldDst,*(uint64_t*)&pc);
     }
@@ -292,7 +295,7 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
         DPRINTF(VectorInst,"inst: %s %s%d v%d %s%d %s       PC 0x%X\n",
             insn.getName(),reg_type,insn.vd(),insn.vs2(),scr1_type,insn.vs1(),
             masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s%d %s  old_dst v%d"
+        DPRINTF(VectorInstRenamed,"renamed inst: %s %s%d v%d %s%d %s  old_dst v%d"
             "        PC 0x%X\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,Pvs1,
             mask_ren.str(),POldDst,*(uint64_t*)&pc);
     }
@@ -300,7 +303,7 @@ VectorEngine::printArithInst(RiscvISA::VectorStaticInst& insn,VectorDynInst *vec
         DPRINTF(VectorInst,"inst: %s %s%d v%d %s%d %s       PC 0x%X\n",
             insn.getName(),reg_type,insn.vd(),insn.vs2(),scr1_type,insn.vs1(),
             masked,*(uint64_t*)&pc );
-        DPRINTF(VectorRename,"renamed inst: %s %s%d v%d %s%d v%d %s "
+        DPRINTF(VectorInstRenamed,"renamed inst: %s %s%d v%d %s%d v%d %s "
             "old_dst v%d         PC 0x%X\n",insn.getName(),reg_type,PDst,Pvs2,scr1_type,
             Pvs1,POldDst,mask_ren.str(),POldDst,*(uint64_t*)&pc);
     } else {

@@ -41,4 +41,5 @@ DebugFlag('VectorEngineInterface')
 DebugFlag('VectorEngine')
 DebugFlag('VectorEngineInfo')
 DebugFlag('VectorInst')
+DebugFlag('VectorInstRenamed')
 
