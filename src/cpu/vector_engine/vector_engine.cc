@@ -414,7 +414,7 @@ VectorEngine::dispatch(RiscvISA::VectorStaticInst& insn, ExecContextPtr& xc,
         bool change_vtype = ((vector_config->get_vtype_sew(last_vtype) == 16) || (vector_config->get_vtype_sew(last_vtype) == 8)) 
                             /*&& (vector_config->get_vtype_lmul_prueba(last_vtype) != 1)*/;
         last_vl = (change_vtype) ? last_vl/8: last_vl; // Descomentar esta linea para particlefilter lmul8
-        last_vtype = (change_vtype) ? 14:last_vtype;
+        last_vtype = (change_vtype) ? 12:last_vtype;
 
         dependencie_callback();
         printConfigInst(insn,src1,src2);
