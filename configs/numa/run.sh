@@ -1,0 +1,1 @@
+./build/RISCV/gem5.opt ./configs/example/riscv_vector_engine.py --v_lanes 4 --cmd='../riscv-vectorized-benchmark-suite/_blackscholes/bin/blackscholes_vector.exe 1 /home/zhewenhu/riscv-vectorized-benchmark-suite/_blackscholes/input/in_64K.input /home/zhewenhu/riscv-vectorized-benchmark-suite/_blackscholes/prices.txt'
