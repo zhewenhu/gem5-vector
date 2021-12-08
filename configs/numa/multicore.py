@@ -21,6 +21,8 @@ from common.Caches import *
 ps = OptionParser()
 
 # GENERAL OPTIONS
+ps.add_option('-n', '--num_cpus',   type="int", default=1)
+
 ps.add_option('--cmd',              type="string",
                                     help="Command to run on the CPU")
 ps.add_option('--output',           type="string",
@@ -113,33 +115,24 @@ system = System(
 # CPU CONFIG
 ###############################################################################
 #system.cpu = MinorCPU(mem_unit_channels = mem_unit_channels)
-system.cpu = MinorCPU()
+num_cpus = options.num_cpus
+system.cpu = [MinorCPU() for i in range(num_cpus)]
 
 ###############################################################################
 # Create CPU and add simple Icache and Dcache
 ###############################################################################
 
-system.cpu.icache = Cache(
-    size = options.l1i_size,
-    assoc = 4,
-    tag_latency = 4,
-    data_latency = 4,
-    response_latency = 4,
-    mshrs = 4,
-    tgts_per_mshr = 20
-)
-system.cpu.dcache = Cache(
-    size = options.l1d_size,
-    assoc = 4,
-    tag_latency = 4,
-    data_latency = 4,
-    response_latency = 4,
-    mshrs = 4,
-    tgts_per_mshr = 20
-)
-
-def createVectorCache(cpu):
-    system.VectorCache = Cache(
+for cpu in system.cpu:
+    cpu.icache = Cache(
+        size = options.l1i_size,
+        assoc = 4,
+        tag_latency = 4,
+        data_latency = 4,
+        response_latency = 4,
+        mshrs = 4,
+        tgts_per_mshr = 20
+    )
+    cpu.dcache = Cache(
         size = options.l1d_size,
         assoc = 4,
         tag_latency = 4,
@@ -149,8 +142,19 @@ def createVectorCache(cpu):
         tgts_per_mshr = 20
     )
 
-def createbuffer(cpu):
-    system.VectorCache = Cache(
+def createVectorCache(cpu, num_cpus):
+    system.VectorCache = [Cache(
+        size = options.l1d_size,
+        assoc = 4,
+        tag_latency = 4,
+        data_latency = 4,
+        response_latency = 4,
+        mshrs = 4,
+        tgts_per_mshr = 20
+    ) for i in range(num_cpus)]
+
+def createbuffer(cpu, num_cpus):
+    system.VectorCache = [Cache(
         size = "2kB",
         assoc = 1,
         tag_latency = 0,
@@ -158,111 +162,112 @@ def createbuffer(cpu):
         response_latency = 0,
         mshrs = 4,
         tgts_per_mshr = 20
-    )
+    ) for i in range(num_cpus)]
 
 if( (not connect_to_l1d) and (not connect_to_l2) and (not connect_to_dram)):
-    createVectorCache(system.cpu)
+    createVectorCache(cpu, num_cpus)
 
 if( (connect_to_l2) or (connect_to_dram)):
-    createbuffer(system.cpu)
+    createbuffer(cpu, num_cpus)
 
 ###############################################################################
 # VECTOR EXTESION CONFIG
 ###############################################################################
-system.cpu.ve_interface = VectorEngineInterface(
-    vector_engine = VectorEngine(
-        vector_rf_ports = vector_rf_ports,
-        vector_config = VectorConfig(
-            max_vl = options.max_vl
-        ),
-        vector_reg = VectorRegister(
-            num_lanes = options.v_lanes/options.num_clusters,
-            num_regs = options.renamed_regs,
-            mvl = options.max_vl,
-            size = (options.renamed_regs * options.max_vl)/8,
-            lineSize =options.VRF_line_size
-                        *(options.v_lanes/options.num_clusters),
-            numPorts = vector_rf_ports,
-            accessLatency = 1
-        ),
-        vector_inst_queue = InstQueue(
-            OoO_queues=options.OoO_queues,
-            vector_mem_queue_size = options.mem_queue_size,
-            vector_arith_queue_size = options.arith_queue_size
-        ),
-        vector_rename = VectorRename(
-            PhysicalRegs = options.renamed_regs
-        ),
-        vector_rob = ReorderBuffer(
-            ROB_Size = options.rob_size
-        ),
-        vector_reg_validbit = VectorValidBit(
-            PhysicalRegs = options.renamed_regs
-        ),
-        vector_memory_unit = VectorMemUnit(
-            memReader = MemUnitReadTiming(
-                channel = (((options.num_clusters-1)*5)+5 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize = options.VRF_line_size
-                               * (options.v_lanes/options.num_clusters)
+for cpu in system.cpu:
+    cpu.ve_interface = VectorEngineInterface(
+        vector_engine = VectorEngine(
+            vector_rf_ports = vector_rf_ports,
+            vector_config = VectorConfig(
+                max_vl = options.max_vl
             ),
-            memWriter = MemUnitWriteTiming(
-                channel = (((options.num_clusters-1)*5)+6 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize = options.VRF_line_size
-                               * (options.v_lanes/options.num_clusters)
+            vector_reg = VectorRegister(
+                num_lanes = options.v_lanes/options.num_clusters,
+                num_regs = options.renamed_regs,
+                mvl = options.max_vl,
+                size = (options.renamed_regs * options.max_vl)/8,
+                lineSize =options.VRF_line_size
+                            *(options.v_lanes/options.num_clusters),
+                numPorts = vector_rf_ports,
+                accessLatency = 1
             ),
-            memReader_addr = MemUnitReadTiming(
-                channel = (((options.num_clusters-1)*5)+7 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize = options.VRF_line_size
-                               * (options.v_lanes/options.num_clusters)
-            )
-        ),
-        num_clusters = options.num_clusters,
-        num_lanes = options.v_lanes,
-        vector_lane = [VectorLane(
-            lane_id = lane_id,
-            srcAReader = MemUnitReadTiming(
-                channel = ((lane_id*5)+0 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize =  options.VRF_line_size
+            vector_inst_queue = InstQueue(
+                OoO_queues=options.OoO_queues,
+                vector_mem_queue_size = options.mem_queue_size,
+                vector_arith_queue_size = options.arith_queue_size
+            ),
+            vector_rename = VectorRename(
+                PhysicalRegs = options.renamed_regs
+            ),
+            vector_rob = ReorderBuffer(
+                ROB_Size = options.rob_size
+            ),
+            vector_reg_validbit = VectorValidBit(
+                PhysicalRegs = options.renamed_regs
+            ),
+            vector_memory_unit = VectorMemUnit(
+                memReader = MemUnitReadTiming(
+                    channel = (((options.num_clusters-1)*5)+5 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize = options.VRF_line_size
                                 * (options.v_lanes/options.num_clusters)
-            ),
-            srcBReader = MemUnitReadTiming(
-                channel = ((lane_id*5)+1 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize = options.VRF_line_size
-                        * (options.v_lanes/options.num_clusters)
-            ),
-            srcMReader = MemUnitReadTiming(
-                channel = ((lane_id*5)+2 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize =  options.VRF_line_size
+                ),
+                memWriter = MemUnitWriteTiming(
+                    channel = (((options.num_clusters-1)*5)+6 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize = options.VRF_line_size
                                 * (options.v_lanes/options.num_clusters)
-            ),
-            dstReader = MemUnitReadTiming(
-                channel = ((lane_id*5)+3 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize =  options.VRF_line_size
+                ),
+                memReader_addr = MemUnitReadTiming(
+                    channel = (((options.num_clusters-1)*5)+7 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize = options.VRF_line_size
                                 * (options.v_lanes/options.num_clusters)
-            ),
-            dstWriter = MemUnitWriteTiming(
-                channel = ((lane_id*5)+4 if multiport else 0),
-                cacheLineSize = options.cache_line_size,
-                VRF_LineSize =  options.VRF_line_size
-                                * (options.v_lanes/options.num_clusters)
-            ),
-            dataPath = Datapath(
-                VectorLanes = (options.v_lanes/options.num_clusters),
-                clk_domain = SrcClockDomain(
-                    clock = options.vector_clk,
-                    voltage_domain = VoltageDomain()
                 )
-            )
-        )for lane_id in range(0,options.num_clusters)]
+            ),
+            num_clusters = options.num_clusters,
+            num_lanes = options.v_lanes,
+            vector_lane = [VectorLane(
+                lane_id = lane_id,
+                srcAReader = MemUnitReadTiming(
+                    channel = ((lane_id*5)+0 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize =  options.VRF_line_size
+                                    * (options.v_lanes/options.num_clusters)
+                ),
+                srcBReader = MemUnitReadTiming(
+                    channel = ((lane_id*5)+1 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize = options.VRF_line_size
+                            * (options.v_lanes/options.num_clusters)
+                ),
+                srcMReader = MemUnitReadTiming(
+                    channel = ((lane_id*5)+2 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize =  options.VRF_line_size
+                                    * (options.v_lanes/options.num_clusters)
+                ),
+                dstReader = MemUnitReadTiming(
+                    channel = ((lane_id*5)+3 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize =  options.VRF_line_size
+                                    * (options.v_lanes/options.num_clusters)
+                ),
+                dstWriter = MemUnitWriteTiming(
+                    channel = ((lane_id*5)+4 if multiport else 0),
+                    cacheLineSize = options.cache_line_size,
+                    VRF_LineSize =  options.VRF_line_size
+                                    * (options.v_lanes/options.num_clusters)
+                ),
+                dataPath = Datapath(
+                    VectorLanes = (options.v_lanes/options.num_clusters),
+                    clk_domain = SrcClockDomain(
+                        clock = options.vector_clk,
+                        voltage_domain = VoltageDomain()
+                    )
+                )
+            )for lane_id in range(0,options.num_clusters)]
+        )
     )
-)
 
 
 ###############################################################################
@@ -278,7 +283,8 @@ def createl1bus(cpu):
     )
 
 if(connect_to_l1d):
-    createl1bus(system.cpu)
+    for cpu in system.cpu:
+        createl1bus(cpu)
 ###############################################################################
 # Create l2Xbar and SystemXBar
 ###############################################################################
@@ -304,33 +310,35 @@ def connectCPUPorts1(cpu,vector_engine,l1bus,l2bus,membus):
     for channel in range(0, vector_rf_ports):
         vector_engine.vector_reg_port = vector_engine.vector_reg.port
 
-def connectCPUPorts2(cpu,vector_engine,l2bus,membus):
+def connectCPUPorts2(cpu,vector_engine,VectorCache,l2bus,membus):
     cpu.icache.mem_side = l2bus.slave
     cpu.dcache.mem_side = l2bus.slave
     cpu.icache_port = cpu.icache.cpu_side
     cpu.dcache_port = cpu.dcache.cpu_side
 
     if(connect_to_l1V):
-        vector_engine.vector_mem_port = system.VectorCache.cpu_side
-        system.VectorCache.mem_side = l2bus.slave
+        vector_engine.vector_mem_port = VectorCache.cpu_side
+        VectorCache.mem_side = l2bus.slave
     else:
         if(connect_to_l2):
-            vector_engine.vector_mem_port = system.VectorCache.cpu_side
-            system.VectorCache.mem_side = l2bus.slave
+            vector_engine.vector_mem_port = VectorCache.cpu_side
+            VectorCache.mem_side = l2bus.slave
         else:
             if(connect_to_dram):
-                vector_engine.vector_mem_port = system.VectorCache.cpu_side
-                system.VectorCache.mem_side = membus.slave
+                vector_engine.vector_mem_port = VectorCache.cpu_side
+                VectorCache.mem_side = membus.slave
 
     for channel in range(0, vector_rf_ports):
         vector_engine.vector_reg_port = vector_engine.vector_reg.port
 
 if(connect_to_l1d):
-    connectCPUPorts1(system.cpu, system.cpu.ve_interface.vector_engine,
-        system.l1bus,system.l2bus, system.membus)
+    for i in range(num_cpus):
+        connectCPUPorts1(system.cpu[i], system.cpu[i].ve_interface.vector_engine, system.VectorCache[i],
+            system.l1bus,system.l2bus, system.membus)
 else:
-    connectCPUPorts2(system.cpu, system.cpu.ve_interface.vector_engine,
-        system.l2bus, system.membus)
+    for i in range(num_cpus):
+        connectCPUPorts2(system.cpu[i], system.cpu[i].ve_interface.vector_engine, system.VectorCache[i],
+            system.l2bus, system.membus)
 
 ###############################################################################
 # Everything from the l2Xbar down
@@ -352,7 +360,8 @@ system.l2cache.mem_side = system.membus.slave
 system.l2cache.cpu_side = system.l2bus.master
 
 #create interrupt controller
-system.cpu.createInterruptController()
+for cpu in system.cpu:
+    cpu.createInterruptController()
 
 # Connect the system up to the membus
 system.system_port = system.membus.slave
@@ -387,8 +396,9 @@ else:
     process.cmd = filtered
 #    process.output = output[0]
 
-system.cpu.workload = process
-system.cpu.createThreads()
+for cpu in system.cpu:
+    cpu.workload = process
+    cpu.createThreads()
 
 
 ###############################################################################
